@@ -36,8 +36,8 @@ export async function queryBigQuery(query: string, params?: any) {
 export async function getLatestProcessedData() {
     const query = `
         SELECT *
-        FROM \`${projectId}.stock_data.processed_stock_data\`
-        ORDER BY processed_at DESC
+        FROM \`${projectId}.stock_data.processed_stock_data_history\`
+        WHERE is_current = 'yes'
         LIMIT 1000
     `;
     return queryBigQuery(query);

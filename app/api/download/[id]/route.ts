@@ -5,9 +5,9 @@ import { getGCSFileContent } from '@/lib/gcs';
 
 export async function GET(
     _request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = params;
+    const { id } = await params;
     const filename = `full_export_${id}.csv`;
     const filePath = path.join(process.cwd(), 'data', filename);
 

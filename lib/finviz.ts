@@ -196,15 +196,15 @@ export async function getIndustryPerformance(snapshotId?: string, forceFetch = f
         const query = `
             WITH latest_data AS (
                 SELECT *
-                FROM \`${process.env.GCP_PROJECT_ID}.stock_data.processed_stock_data\`
-                WHERE processed_at = (SELECT MAX(processed_at) FROM \`${process.env.GCP_PROJECT_ID}.stock_data.processed_stock_data\`)
+                FROM \`${process.env.GCP_PROJECT_ID}.stock_data.processed_stock_data_history\`
+                WHERE is_current = 'yes'
             )
             SELECT 
                 industry as name,
                 AVG(SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64)) as week,
                 AVG(SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64)) as month,
                 AVG(SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64)) - AVG(SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64)) as momentum,
-                SUM(SAFE_CAST(REPLACE(market_cap, 'B', '') AS FLOAT64)) * 1000000000 as marketCap,
+                SUM(SAFE_CAST(market_cap AS FLOAT64)) as marketCap,
                 COUNT(*) as stockCount
             FROM latest_data
             GROUP BY industry
