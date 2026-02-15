@@ -5,7 +5,7 @@ import { IndustryApiResponse } from '@/types';
 import PerformanceTable from './PerformanceTable';
 import MomentumMatrix from './MomentumMatrix';
 import MarketMonitor from './MarketMonitor';
-import { LayoutGrid, Scale, Clock, History, ChevronDown, RefreshCw, Download } from 'lucide-react';
+import { LayoutGrid, Scale, Clock, History, ChevronDown, RefreshCw, Download, Briefcase, PieChart, Filter } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { refreshMarketData } from '@/lib/finviz';
 import { useTransition } from 'react';
@@ -13,14 +13,17 @@ import { useTransition } from 'react';
 interface Props {
     data: IndustryApiResponse;
     snapshots: { id: string; label: string; timestamp: number }[];
+    sectors?: string[];
 }
 
-export default function DashboardContent({ data: { data, lastUpdated }, snapshots }: Props) {
+export default function DashboardContent({ data: { data, lastUpdated }, snapshots, sectors = [] }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [isRefreshing, startRefresh] = useTransition();
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentSnapshot = searchParams.get('snapshot') || 'live';
+    const groupBy = searchParams.get('groupBy') || 'industry';
+    const currentSector = searchParams.get('sector') || 'all';
 
     // Get the date string for the download link
     const downloadId = currentSnapshot === 'live' && snapshots.length > 0
@@ -85,6 +88,76 @@ export default function DashboardContent({ data: { data, lastUpdated }, snapshot
                         </div>
                     </div>
 
+                    {/* Grouping Toggle (Industry vs Sector) */}
+                    <div className="flex flex-col items-center gap-3">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Grouping</label>
+                        <div className="bg-white p-1 rounded-2xl flex items-center gap-1 border border-gray-100 shadow-xl shadow-gray-100/50">
+                            <button
+                                onClick={() => {
+                                    const params = new URLSearchParams(searchParams.toString());
+                                    params.set('groupBy', 'industry');
+                                    // Keep sector filter if it exists, or maybe clear it? Keeping it seems fine if it's relevant. 
+                                    // Actually if switching to Industry, we might want to see all or keep the filter. 
+                                    // If switching to Sector, the filter is hidden anyway.
+                                    router.push(`/?${params.toString()}`);
+                                }}
+                                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'industry'
+                                    ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
+                                    : 'text-gray-500 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <Briefcase size={18} />
+                                Industry
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const params = new URLSearchParams(searchParams.toString());
+                                    params.set('groupBy', 'sector');
+                                    params.delete('sector'); // Clear sector filter when viewing sectors
+                                    router.push(`/?${params.toString()}`);
+                                }}
+                                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'sector'
+                                    ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
+                                    : 'text-gray-500 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <PieChart size={18} />
+                                Sector
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Sector Filter (Only visible when grouping by Industry) */}
+                    {groupBy === 'industry' && (
+                        <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Filter Sector</label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                                    <Filter size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
+                                </div>
+                                <select
+                                    value={currentSector}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const params = new URLSearchParams(searchParams.toString());
+                                        if (val === 'all') params.delete('sector');
+                                        else params.set('sector', val);
+                                        router.push(`/?${params.toString()}`);
+                                    }}
+                                    className="pl-12 pr-10 py-3.5 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-xl shadow-gray-100/50 appearance-none cursor-pointer hover:border-blue-100 transition-all outline-none focus:ring-2 focus:ring-blue-50 max-w-[200px]"
+                                >
+                                    <option value="all">All Sectors</option>
+                                    {sectors.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                                    <ChevronDown size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Snapshot History Selector */}
                     <div className="flex flex-col items-center gap-3">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Fetching Point</label>
@@ -112,26 +185,6 @@ export default function DashboardContent({ data: { data, lastUpdated }, snapshot
                                 </div>
                             </div>
 
-                            {/* Download Button */}
-                            {downloadId && downloadId !== 'live' && (
-                                <a
-                                    href={`/api/download/${downloadId}`}
-                                    className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-500 hover:text-[#3D3DFF] hover:border-blue-100 shadow-xl shadow-gray-100/50 transition-all flex items-center justify-center group shrink-0"
-                                    title="Download Full Ticker Export (CSV)"
-                                    download
-                                >
-                                    <Download size={20} className="group-hover:scale-110 transition-transform" />
-                                </a>
-                            )}
-
-                            <button
-                                onClick={handleRefresh}
-                                disabled={isRefreshing}
-                                className={`p-3.5 bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-100/50 transition-all hover:bg-gray-50 flex items-center justify-center group ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title="Refresh Data from Finviz"
-                            >
-                                <RefreshCw size={18} className={`text-[#3D3DFF] ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -151,18 +204,18 @@ export default function DashboardContent({ data: { data, lastUpdated }, snapshot
             {/* Momentum Matrix Visualization Section */}
             <div className="mt-16">
                 <h2 className="text-3xl font-bold text-black mb-10 text-center">Momentum & Performance Visualization</h2>
-                <MomentumMatrix data={displayData} />
+                <MomentumMatrix data={displayData} groupBy={groupBy as 'industry' | 'sector'} />
             </div>
 
             {/* Market Monitor - High Level Overview */}
             <div className="mt-24">
-                <MarketMonitor data={displayData} />
+                <MarketMonitor data={displayData} groupBy={groupBy as 'industry' | 'sector'} />
             </div>
 
             {/* Full Industry Breakdown Table */}
             <div className="pt-24 border-t border-gray-100 mt-24">
-                <h2 className="text-4xl font-bold mb-10">Full Industry Breakdown</h2>
-                <PerformanceTable data={displayData} />
+                <h2 className="text-4xl font-bold mb-10">Full {groupBy === 'sector' ? 'Sector' : 'Industry'} Breakdown</h2>
+                <PerformanceTable data={displayData} title={groupBy === 'sector' ? 'Sector Performance' : 'Industry Performance'} />
             </div>
 
             {/* Decorative element moved inside the container for better positioning */}

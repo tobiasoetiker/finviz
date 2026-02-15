@@ -5,9 +5,10 @@ import Link from 'next/link';
 
 interface Props {
     data: GroupPerformance[];
+    groupBy?: 'industry' | 'sector';
 }
 
-export default function MarketMonitor({ data }: Props) {
+export default function MarketMonitor({ data, groupBy = 'industry' }: Props) {
     // We'll use the industry data to fill the "Market Monitor" table
     // Top 10 industries by market cap for the "Market Monitor" view
     const top10 = [...data]
@@ -45,13 +46,13 @@ export default function MarketMonitor({ data }: Props) {
                 </Link>
             </div>
 
-            <h3 className="text-2xl font-bold text-black mb-8">Market Monitor - Industry Performance</h3>
+            <h3 className="text-2xl font-bold text-black mb-8">Market Monitor - {groupBy === 'sector' ? 'Sector' : 'Industry'} Performance</h3>
 
             <div className="w-full">
                 <table className="w-full text-left">
                     <thead>
                         <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                            <th className="pb-4">Industry</th>
+                            <th className="pb-4">{groupBy === 'sector' ? 'Sector' : 'Industry'}</th>
                             <th className="pb-4 text-center">Week</th>
                             <th className="pb-4 text-center">Month</th>
                             <th className="pb-4 text-center">Momentum</th>

@@ -5,9 +5,10 @@ import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Responsive
 
 interface Props {
   data: GroupPerformance[];
+  groupBy?: 'industry' | 'sector';
 }
 
-export default function MomentumMatrix({ data }: Props) {
+export default function MomentumMatrix({ data, groupBy = 'industry' }: Props) {
   // Use all data points as requested
   const chartData = [...data].sort((a, b) => b.marketCap - a.marketCap);
 
@@ -61,43 +62,65 @@ export default function MomentumMatrix({ data }: Props) {
 
   // Custom label renderer to only show labels for the top-right quadrant
   const renderCustomLabel = (props: any) => {
-    const { x, y, payload } = props;
-    if (!payload || !payload.name) return null;
+    const { x, y, value } = props;
 
-    const { momentum, week, name } = payload;
+    return (
+      <text
+        x={x + 10}
+        y={y}
+        dy={4}
+        fill="#3D3DFF"
+        fontSize={10}
+        fontWeight={800}
+        textAnchor="start"
+        className="pointer-events-none select-none"
+        style={{ textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}
+      >
+        {value}
+      </text>
+    );
+  };
 
-    // Only label if in the top-right quadrant (Leader)
-    if (momentum > 0 && week > 0) {
-      return (
-        <text
-          x={x}
-          y={y - 12}
-          fill="#3D3DFF"
-          fontSize={10}
-          fontWeight={800}
-          textAnchor="middle"
-          className="pointer-events-none select-none"
-          style={{ textShadow: '0 1px 2px rgba(255,255,255,0.8)' }}
-        >
-          {name}
-        </text>
-      );
-    }
-    return null;
+  // Calculate dynamic domain for the quadrants
+  const maxAbsMomentum = Math.max(...chartData.map(d => Math.abs(d.momentum)), 5); // min 5 for empty charts
+  const maxAbsWeek = Math.max(...chartData.map(d => Math.abs(d.week)), 5);
+
+  // Add a buffer to ensure we cover the whole view
+  const xBound = maxAbsMomentum * 1.5;
+  const yBound = maxAbsWeek * 1.5;
+
+  const renderQuadrantLabel = (props: any, text: string, color: string, align: 'left' | 'right', vAlign: 'top' | 'bottom') => {
+    const { viewBox } = props;
+    const { x, y, width, height } = viewBox;
+
+    const textX = align === 'right' ? x + width - 20 : x + 20;
+    const textY = vAlign === 'bottom' ? y + height - 20 : y + 20;
+
+    return (
+      <text
+        x={textX}
+        y={textY}
+        fill={color}
+        textAnchor={align === 'right' ? 'end' : 'start'}
+        dominantBaseline={vAlign === 'bottom' ? 'auto' : 'hanging'}
+        fontSize={14}
+        fontWeight={900}
+        style={{ opacity: 0.6, pointerEvents: 'none', userSelect: 'none' }}
+      >
+        {text}
+      </text>
+    );
   };
 
   return (
     <div className="w-full bg-white border border-gray-50 rounded-2xl p-6 shadow-sm">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold text-black flex items-center gap-2">
-          Industry Momentum vs Performance
-          <span className="text-[11px] font-normal text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wider">All Industries</span>
+          {groupBy === 'sector' ? 'Sector' : 'Industry'} Momentum vs Performance
+          <span className="text-[11px] font-normal text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wider">All {groupBy === 'sector' ? 'Sectors' : 'Industries'}</span>
         </h3>
         <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-tight">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#7CFFC4] opacity-40 border border-[#7CFFC4]"></div>
-            <span>Leader Quadrant</span>
-          </div>
+          {/* Legend removed as quadrants are self-labeled */}
         </div>
       </div>
 
@@ -116,7 +139,9 @@ export default function MomentumMatrix({ data }: Props) {
               fontWeight={500}
               tickLine={false}
               axisLine={{ stroke: '#f1f5f9' }}
-              domain={['auto', 'auto']}
+              domain={[-xBound, xBound]}
+              allowDataOverflow={false}
+              tickFormatter={(value) => value.toFixed(1)}
             >
               <Label value="Momentum (Weekly - Monthly)" offset={-25} position="insideBottom" style={{ fill: '#64748b', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
             </XAxis>
@@ -130,22 +155,41 @@ export default function MomentumMatrix({ data }: Props) {
               fontWeight={500}
               tickLine={false}
               axisLine={{ stroke: '#f1f5f9' }}
-              domain={['auto', 'auto']}
+              domain={[-yBound, yBound]}
+              allowDataOverflow={false}
+              tickFormatter={(value) => value.toFixed(1)}
             >
               <Label value="Weekly Performance" angle={-90} position="insideLeft" style={{ fill: '#64748b', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
             </YAxis>
 
-            {/* Highlight Top Right Quadrant (Leaders) - Rendered behind dots */}
+            {/* Quadrant Backgrounds & Labels */}
+
+            {/* Leading (Top-Right) */}
             <ReferenceArea
-              x1={0}
-              x2={200}
-              y1={0}
-              y2={200}
-              fill="#7CFFC4"
-              fillOpacity={0.2}
-              stroke="#7CFFC4"
-              strokeWidth={1}
-              strokeDasharray="4 4"
+              x1={0} x2={xBound} y1={0} y2={yBound}
+              fill="#C6F6D5" fillOpacity={0.05} stroke="none"
+              label={(props) => renderQuadrantLabel(props, 'LEADING', '#276749', 'right', 'top')}
+            />
+
+            {/* Weakening (Top-Left) */}
+            <ReferenceArea
+              x1={-xBound} x2={0} y1={0} y2={yBound}
+              fill="#FEFCBF" fillOpacity={0.05} stroke="none"
+              label={(props) => renderQuadrantLabel(props, 'WEAKENING', '#975A16', 'left', 'top')}
+            />
+
+            {/* Lagging (Bottom-Left) */}
+            <ReferenceArea
+              x1={-xBound} x2={0} y1={-yBound} y2={0}
+              fill="#FED7D7" fillOpacity={0.05} stroke="none"
+              label={(props) => renderQuadrantLabel(props, 'LAGGING', '#9B2C2C', 'left', 'bottom')}
+            />
+
+            {/* Improving (Bottom-Right) */}
+            <ReferenceArea
+              x1={0} x2={xBound} y1={-yBound} y2={0}
+              fill="#BEE3F8" fillOpacity={0.05} stroke="none"
+              label={(props) => renderQuadrantLabel(props, 'IMPROVING', '#2C5282', 'right', 'bottom')}
             />
 
             {/* Quadrant Lines */}
@@ -155,7 +199,7 @@ export default function MomentumMatrix({ data }: Props) {
             <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: '#cbd5e1' }} />
 
             <Scatter
-              name="Industries"
+              name={groupBy === 'sector' ? 'Sectors' : 'Industries'}
               data={chartData}
               fill="#3D3DFF"
               fillOpacity={0.6}
@@ -171,11 +215,9 @@ export default function MomentumMatrix({ data }: Props) {
       <div className="mt-6 flex flex-wrap gap-4 text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center justify-center">
         <div className="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#3D3DFF]"></span>
-          Industries
+          {groupBy === 'sector' ? 'Sectors' : 'Industries'}
         </div>
-        <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg border border-green-100 italic">
-          Labels shown for Top-Right Quadrant only (Leaders)
-        </div>
+
       </div>
     </div>
   );
