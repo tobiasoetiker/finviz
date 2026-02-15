@@ -14,7 +14,14 @@ export default function MarketMonitor({ data }: Props) {
         .sort((a, b) => b.marketCap - a.marketCap)
         .slice(0, 10);
 
-    const formatPill = (val: number) => {
+    const formatPill = (val: number | null | undefined) => {
+        if (val === null || val === undefined) {
+            return (
+                <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-md text-xs font-bold inline-block min-w-[60px] text-center">
+                    -
+                </span>
+            );
+        }
         const isPositive = val >= 0;
         const bg = isPositive ? 'bg-[#C6F6D5]' : 'bg-[#FED7D7]';
         const text = isPositive ? 'text-[#22543D]' : 'text-[#822727]';

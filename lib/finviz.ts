@@ -198,15 +198,36 @@ export async function getIndustryPerformance(snapshotId?: string, forceFetch = f
                 SELECT *
                 FROM \`${process.env.GCP_PROJECT_ID}.stock_data.processed_stock_data_history\`
                 WHERE is_current = 'yes'
+            ),
+            clean_data AS (
+                SELECT 
+                    industry,
+                    ticker,
+                    SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
+                    SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                    SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
+                FROM latest_data
             )
             SELECT 
                 industry as name,
-                AVG(SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64)) as week,
-                AVG(SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64)) as month,
-                AVG(SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64)) - AVG(SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64)) as momentum,
-                SUM(SAFE_CAST(market_cap AS FLOAT64)) as marketCap,
-                COUNT(*) as stockCount
-            FROM latest_data
+                -- Market-Cap Weighted
+                SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
+                SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
+                (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - (SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) as momentum,
+                
+                -- Equal Weighted
+                AVG(pct_week) as weekEqual,
+                AVG(pct_month) as monthEqual,
+                AVG(pct_week) - AVG(pct_month) as momentumEqual,
+                
+                SUM(mcap) as marketCap,
+                COUNT(*) as stockCount,
+
+                -- Top Drivers (Top 5 by weekly performance)
+                ARRAY_AGG(
+                    STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5
+                ) as topStocks
+            FROM clean_data
             GROUP BY industry
             ORDER BY momentum DESC
         `;

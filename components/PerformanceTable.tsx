@@ -45,16 +45,27 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
         return sortDesc ? <ArrowDown size={14} className="text-blue-600" /> : <ArrowUp size={14} className="text-blue-600" />;
     };
 
-    const formatPercent = (val: number) => `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
-    const formatMoney = (val: number) => {
-        if (val >= 1e9) return `$${(val / 1e9).toFixed(1)}B`;
-        if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;
-        return `$${val.toLocaleString('en-US')}`;
+    const formatPercent = (val: number | null | undefined) => {
+        if (val === null || val === undefined) return '-';
+        return `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
     };
 
+    const formatMoney = (val: number | null | undefined) => {
+        if (val === null || val === undefined) return '-';
+        if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
+        if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
+        if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
+        if (val >= 1e3) return `$${(val / 1e3).toFixed(2)}K`;
+        return `$${val.toFixed(2)}`;
+    };
+
+    // Calculate max market cap for bar visualization
+    const maxMarketCap = Math.max(...data.map(item => item.marketCap || 0));
+
     // Modern Badge Style
-    const getBadgeClass = (val: number) => {
+    const getBadgeClass = (val: number | null | undefined) => {
         const base = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
+        if (val === null || val === undefined) return `${base} bg-slate-100 text-slate-800`;
         if (val > 0) return `${base} bg-emerald-100 text-emerald-800`;
         if (val < 0) return `${base} bg-rose-100 text-rose-800`;
         return `${base} bg-slate-100 text-slate-800`;
@@ -88,7 +99,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                             <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
                                 <div className="flex items-center space-x-1"><span>Name</span> <SortIcon column="name" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('marketCap')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors w-32" onClick={() => handleSort('marketCap')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Market Cap</span> <SortIcon column="marketCap" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('week')}>
@@ -108,11 +119,16 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                     <tbody className="divide-y divide-slate-100">
                         {sortedData.map((item) => (
                             <tr key={item.name} className="hover:bg-slate-50/80 transition-colors group">
-                                <th scope="row" className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
+                                <th scope="row" className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap max-w-[200px] truncate" title={item.name}>
                                     {item.name}
                                 </th>
-                                <td className="px-6 py-4 text-right text-slate-500 font-mono text-xs">
-                                    {formatMoney(item.marketCap)}
+                                <td className="px-6 py-4 text-right text-slate-500 font-mono text-xs relative">
+                                    {/* Visual Bar Background */}
+                                    <div
+                                        className="absolute inset-y-0 right-0 bg-blue-200/50 transition-all duration-500 border-l border-blue-300/50"
+                                        style={{ width: `${Math.max((item.marketCap / maxMarketCap) * 100, 1)}%`, zIndex: 0 }}
+                                    />
+                                    <span className="relative z-10 font-bold text-slate-700">{formatMoney(item.marketCap)}</span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <span className={getBadgeClass(item.week)}>{formatPercent(item.week)}</span>
@@ -128,7 +144,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                                 <td className="px-6 py-4 text-left">
                                     <div className="flex flex-wrap gap-1.5">
                                         {item.topStocks?.map((stock) => (
-                                            <span key={stock.ticker} className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                            <span key={stock.ticker} className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tighter hover:text-blue-600 hover:border-blue-200 transition-colors cursor-default">
                                                 {stock.ticker}
                                             </span>
                                         ))}

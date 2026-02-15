@@ -4,11 +4,12 @@ import { getIndustryPerformance, getAvailableSnapshots } from '@/lib/finviz';
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: { snapshot?: string };
+  searchParams: Promise<{ snapshot?: string }>;
 }
 
 export default async function Home({ searchParams }: PageProps) {
-  const snapshotId = searchParams.snapshot;
+  const { snapshot } = await searchParams;
+  const snapshotId = snapshot;
   const [data, snapshots] = await Promise.all([
     getIndustryPerformance(snapshotId),
     getAvailableSnapshots()
