@@ -6,6 +6,7 @@ import { IndustryApiResponse, OverviewRow, PerformanceRow, ValuationRow } from '
 import fs from 'fs';
 import path from 'path';
 import { revalidatePath } from 'next/cache';
+import { uploadToGCS, listGCSFiles, getGCSFileContent } from './gcs';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
@@ -110,34 +111,59 @@ async function exportFullTickerData(
     ].join('\n');
 
     const dateStr = getDateString(timestamp);
-    const filePath = path.join(DATA_DIR, `full_export_${dateStr}.csv`);
+    const filename = `full_export_${dateStr}.csv`;
+
+    // Save locally
+    const filePath = path.join(DATA_DIR, filename);
     fs.writeFileSync(filePath, csvContent);
-    console.log(`Saved full export: full_export_${dateStr}.csv (${mergedRows.length} tickers)`);
+
+    // Upload to GCS
+    await uploadToGCS(filename, csvContent, 'text/csv');
+
+    console.log(`Saved full export: ${filename} (${mergedRows.length} tickers)`);
 }
 
-function saveSnapshot(data: IndustryApiResponse) {
+async function saveSnapshot(data: IndustryApiResponse) {
     const dateStr = getDateString(data.lastUpdated);
     const filename = `snapshot_${dateStr}.json`;
+    const content = JSON.stringify(data, null, 2);
+
+    // Save locally
     const filePath = path.join(DATA_DIR, filename);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    fs.writeFileSync(filePath, content);
+
+    // Upload to GCS
+    await uploadToGCS(filename, content, 'application/json');
+
     console.log(`Saved snapshot: ${filename}`);
 }
 
 export async function getAvailableSnapshots() {
-    if (!fs.existsSync(DATA_DIR)) return [];
+    // Try GCS first, fallback to local disk
+    let files: { name: string }[] = [];
+    try {
+        const gcsFiles = await listGCSFiles('snapshot_');
+        if (gcsFiles && gcsFiles.length > 0) {
+            files = gcsFiles;
+        } else {
+            throw new Error('No GCS files found');
+        }
+    } catch (e) {
+        console.log('Falling back to local snapshot listing');
+        if (fs.existsSync(DATA_DIR)) {
+            files = fs.readdirSync(DATA_DIR).map(name => ({ name }));
+        }
+    }
 
-    const files = fs.readdirSync(DATA_DIR)
-        .filter(f => f.startsWith('snapshot_') && f.endsWith('.json'))
+    const snapshots = files
+        .filter(f => f.name.startsWith('snapshot_') && f.name.endsWith('.json'))
         .map(f => {
-            const datePart = f.replace('snapshot_', '').replace('.json', '');
+            const datePart = f.name.replace('snapshot_', '').replace('.json', '');
 
-            // Handle both legacy timestamp names and new date-based names
             let timestamp: number;
             if (datePart.includes('-')) {
-                // ISO Date YYYY-MM-DD - Parse as UTC to be consistent
                 timestamp = new Date(`${datePart}T00:00:00Z`).getTime();
             } else {
-                // Legacy timestamp
                 timestamp = parseInt(datePart);
             }
 
@@ -154,16 +180,26 @@ export async function getAvailableSnapshots() {
         })
         .sort((a, b) => b.timestamp - a.timestamp);
 
-    return files;
+    return snapshots;
 }
 
 export async function getIndustryPerformance(snapshotId?: string, forceFetch = false): Promise<IndustryApiResponse> {
-    // If a specific snapshot is requested, load it from disk
+    // If a specific snapshot is requested, try to load it
     if (snapshotId) {
+        // Try local first
         const filePath = path.join(DATA_DIR, `snapshot_${snapshotId}.json`);
         if (fs.existsSync(filePath)) {
-            console.log(`Loading historical snapshot: ${snapshotId}`);
+            console.log(`Loading local snapshot: ${snapshotId}`);
             return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        }
+
+        // Try GCS fallback
+        try {
+            console.log(`Loading GCS snapshot: ${snapshotId}`);
+            const content = await getGCSFileContent(`snapshot_${snapshotId}.json`);
+            return JSON.parse(content.toString());
+        } catch (e) {
+            console.error(`Failed to load snapshot ${snapshotId} from GCS`, e);
         }
     }
 

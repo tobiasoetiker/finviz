@@ -1,21 +1,33 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { getGCSFileContent } from '@/lib/gcs';
 
 export async function GET(
     _request: Request,
     { params }: { params: { id: string } }
 ) {
     const { id } = params;
-    const filePath = path.join(process.cwd(), 'data', `full_export_${id}.csv`);
+    const filename = `full_export_${id}.csv`;
+    const filePath = path.join(process.cwd(), 'data', filename);
 
-    if (!fs.existsSync(filePath)) {
-        return new NextResponse('File not found', { status: 404 });
+    let fileContent: Buffer;
+
+    // Try local disk first
+    if (fs.existsSync(filePath)) {
+        fileContent = fs.readFileSync(filePath);
+    } else {
+        // Fallback to GCS
+        try {
+            console.log(`Downloading ${filename} from GCS for user download...`);
+            fileContent = await getGCSFileContent(filename);
+        } catch (e) {
+            console.error(`Export ${filename} not found locally or on GCS`);
+            return new NextResponse('File not found', { status: 404 });
+        }
     }
 
-    const fileContent = fs.readFileSync(filePath);
-
-    return new NextResponse(fileContent, {
+    return new NextResponse(fileContent as any, {
         headers: {
             'Content-Type': 'text/csv',
             'Content-Disposition': `attachment; filename="finviz_full_export_${id}.csv"`,
