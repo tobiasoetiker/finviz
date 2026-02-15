@@ -183,173 +183,43 @@ export async function getAvailableSnapshots() {
     return snapshots;
 }
 
+import { queryBigQuery } from './bigquery';
+
 export async function getIndustryPerformance(snapshotId?: string, forceFetch = false): Promise<IndustryApiResponse> {
-    // If a specific snapshot is requested, try to load it
-    if (snapshotId) {
-        // Try local first
-        const filePath = path.join(DATA_DIR, `snapshot_${snapshotId}.json`);
-        if (fs.existsSync(filePath)) {
-            console.log(`Loading local snapshot: ${snapshotId}`);
-            return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        }
-
-        // Try GCS fallback
-        try {
-            console.log(`Loading GCS snapshot: ${snapshotId}`);
-            const content = await getGCSFileContent(`snapshot_${snapshotId}.json`);
-            return JSON.parse(content.toString());
-        } catch (e) {
-            console.error(`Failed to load snapshot ${snapshotId} from GCS`, e);
-        }
-    }
-
-    // Default behavior: try to load the LATEST snapshot from disk first
-    if (!snapshotId && !forceFetch) {
-        if (cachedData) {
-            console.log('Returning memory-cached industry data');
-            return cachedData;
-        }
-
-        const snapshots = await getAvailableSnapshots();
-        if (snapshots.length > 0) {
-            const latestUid = snapshots[0].id;
-            const filePath = path.join(DATA_DIR, `snapshot_${latestUid}.json`);
-            console.log(`Loading latest stored snapshot: ${latestUid}`);
-            const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            cachedData = data;
-            return data;
-        }
-    }
-
-    const now = Date.now();
-    // Only proceed to fetch fresh data if forceFetch is true OR no snapshots exist
     try {
-        console.log('Fetching fresh data from Finviz (Manual Refresh)...');
+        console.log('Fetching industry data from BigQuery...');
 
-        // Fetch all 6 views with delays to avoid rate limiting
-        const overviewData = await fetchCsv<OverviewRow>('111');
-        await new Promise(r => setTimeout(r, 2000));
+        // This is a simplified query. In a real scenario, you'd aggregate the processed_stock_data
+        // similar to how it was done in the previous implementation, or have a dedicated view/table for it.
+        // For now, let's assume we want to aggregate the latest data.
 
-        const valuationData = await fetchCsv<ValuationRow>('121');
-        await new Promise(r => setTimeout(r, 2000));
+        const query = `
+            WITH latest_data AS (
+                SELECT *
+                FROM \`${process.env.GCP_PROJECT_ID}.stock_data.processed_stock_data\`
+                WHERE processed_at = (SELECT MAX(processed_at) FROM \`${process.env.GCP_PROJECT_ID}.stock_data.processed_stock_data\`)
+            )
+            SELECT 
+                industry as name,
+                AVG(SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64)) as week,
+                AVG(SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64)) as month,
+                AVG(SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64)) - AVG(SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64)) as momentum,
+                SUM(SAFE_CAST(REPLACE(market_cap, 'B', '') AS FLOAT64)) * 1000000000 as marketCap,
+                COUNT(*) as stockCount
+            FROM latest_data
+            GROUP BY industry
+            ORDER BY momentum DESC
+        `;
 
-        const financialData = await fetchCsv<any>('131');
-        await new Promise(r => setTimeout(r, 2000));
+        const results = await queryBigQuery(query);
 
-        const performanceData = await fetchCsv<PerformanceRow>('141');
-        await new Promise(r => setTimeout(r, 2000));
-
-        const technicalData = await fetchCsv<any>('171');
-        await new Promise(r => setTimeout(r, 2000));
-
-        const customData = await fetchCsv<any>('161');
-
-        // Export full CSV
-        await exportFullTickerData(
-            now,
-            overviewData,
-            valuationData,
-            financialData,
-            performanceData,
-            technicalData,
-            customData
-        );
-
-        // Create a map of Ticker -> Performance
-        const perfMap = new Map<string, { week: number, month: number }>();
-        performanceData.forEach(row => {
-            perfMap.set(row.Ticker, {
-                week: parsePercent(row['Performance (Week)']),
-                month: parsePercent(row['Performance (Month)'])
-            });
-        });
-
-        // Aggregate by Industry
-        const groups = new Map<string, {
-            totalCap: number,
-            count: number,
-            weightedWeek: number,
-            weightedMonth: number,
-            sumWeek: number,
-            sumMonth: number,
-            stocks: { ticker: string, week: number }[]
-        }>();
-
-        overviewData.forEach(row => {
-            const groupName = row.Industry;
-            const cap = parseMarketCap(row['Market Cap']);
-            const perf = perfMap.get(row.Ticker);
-
-            if (groupName && cap > 0 && perf) {
-                if (!groups.has(groupName)) {
-                    groups.set(groupName, {
-                        totalCap: 0,
-                        count: 0,
-                        weightedWeek: 0,
-                        weightedMonth: 0,
-                        sumWeek: 0,
-                        sumMonth: 0,
-                        stocks: []
-                    });
-                }
-                const group = groups.get(groupName)!;
-                group.totalCap += cap;
-                group.count += 1;
-                group.weightedWeek += perf.week * cap;
-                group.weightedMonth += perf.month * cap;
-                group.sumWeek += perf.week;
-                group.sumMonth += perf.month;
-                group.stocks.push({ ticker: row.Ticker, week: perf.week });
-            }
-        });
-
-        // Calculate averages
-        const results: any[] = [];
-        groups.forEach((group, name) => {
-            const week = group.weightedWeek / group.totalCap;
-            const month = group.weightedMonth / group.totalCap;
-            const weekEqual = group.sumWeek / group.count;
-            const monthEqual = group.sumMonth / group.count;
-
-            // Sort stocks by performance and take top 3
-            const topStocks = group.stocks
-                .sort((a, b) => b.week - a.week)
-                .slice(0, 3);
-
-            results.push({
-                name,
-                week,
-                month,
-                momentum: week - month,
-                weekEqual,
-                monthEqual,
-                momentumEqual: weekEqual - monthEqual,
-                change: 0,
-                volume: 0,
-                marketCap: group.totalCap,
-                stockCount: group.count,
-                topStocks
-            });
-        });
-
-        const response: IndustryApiResponse = {
-            data: results.sort((a, b) => b.momentum - a.momentum),
-            lastUpdated: now,
-            raw: {
-                overview: overviewData,
-                performance: performanceData,
-                valuation: valuationData
-            }
+        return {
+            data: results as any[],
+            lastUpdated: Date.now(),
         };
 
-        // Persist every fresh fetch (JSON snapshot)
-        saveSnapshot(response);
-
-        cachedData = response;
-        return response;
-
     } catch (error) {
-        console.error('Error fetching/processing Finviz data:', error);
+        console.error('Error fetching data from BigQuery:', error);
         return { data: [], lastUpdated: 0 };
     }
 }

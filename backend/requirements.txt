@@ -1,0 +1,7 @@
+finvizfinance
+pandas
+google-cloud-storage
+google-cloud-bigquery
+functions-framework
+pyarrow
+requests
