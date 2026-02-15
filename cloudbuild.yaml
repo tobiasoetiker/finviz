@@ -14,3 +14,6 @@ steps:
   - --memory=512MB
   - --timeout=300s
   - --set-env-vars=PROJECT_ID=finviz-487509,RAW_BUCKET_NAME=finviz-raw-data-1212546082,BQ_DATASET=stock_data,BQ_TABLE=processed_stock_data,FINVIZ_API_KEY=19270963-96d2-430d-adfe-14220d9fd013
+
+options:
+  logging: CLOUD_LOGGING_ONLY
