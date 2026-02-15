@@ -5,13 +5,20 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
+        // Get processed key for debugging (masked)
+        const procKey = process.env.GCP_PRIVATE_KEY
+            ? process.env.GCP_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"|"$/g, '')
+            : '';
+
         const envCheck = {
             hasProject: !!process.env.GCP_PROJECT_ID,
             hasEmail: !!process.env.GCP_CLIENT_EMAIL,
             hasKey: !!process.env.GCP_PRIVATE_KEY,
-            keyLength: process.env.GCP_PRIVATE_KEY ? process.env.GCP_PRIVATE_KEY.length : 0,
-            // Check if key starts/ends correctly (common copy-paste error)
-            validKeyFormat: process.env.GCP_PRIVATE_KEY ? process.env.GCP_PRIVATE_KEY.includes('BEGIN PRIVATE KEY') : false
+            keyLength: procKey.length,
+            // Show start/end to check for bad formatting/quotes
+            keyStart: procKey.substring(0, 20),
+            keyEnd: procKey.substring(procKey.length - 20),
+            validKeyFormat: procKey.includes('BEGIN PRIVATE KEY')
         };
 
         // Try a simple query

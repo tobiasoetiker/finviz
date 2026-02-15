@@ -3,7 +3,9 @@ import { Storage } from '@google-cloud/storage';
 const projectId = process.env.GCP_PROJECT_ID;
 const bucketName = process.env.GCP_BUCKET_NAME;
 const clientEmail = process.env.GCP_CLIENT_EMAIL;
-const privateKey = process.env.GCP_PRIVATE_KEY?.replace(/\\n/g, '\n');
+const privateKey = process.env.GCP_PRIVATE_KEY
+    ? process.env.GCP_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"|"$/g, '')
+    : undefined;
 
 let storage: Storage | null = null;
 

@@ -2,7 +2,9 @@ import { BigQuery } from '@google-cloud/bigquery';
 
 const projectId = process.env.GCP_PROJECT_ID;
 const clientEmail = process.env.GCP_CLIENT_EMAIL;
-const privateKey = process.env.GCP_PRIVATE_KEY?.replace(/\\n/g, '\n');
+const privateKey = process.env.GCP_PRIVATE_KEY
+    ? process.env.GCP_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"|"$/g, '')
+    : undefined;
 
 let bigquery: BigQuery | null = null;
 
