@@ -5,7 +5,7 @@ import { IndustryApiResponse } from '@/types';
 import PerformanceTable from './PerformanceTable';
 import MomentumMatrix from './MomentumMatrix';
 import MarketMonitor from './MarketMonitor';
-import { LayoutGrid, Scale, Clock, History, ChevronDown, RefreshCw } from 'lucide-react';
+import { LayoutGrid, Scale, Clock, History, ChevronDown, RefreshCw, Download } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { refreshMarketData } from '@/lib/finviz';
 import { useTransition } from 'react';
@@ -21,6 +21,11 @@ export default function DashboardContent({ data: { data, lastUpdated }, snapshot
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentSnapshot = searchParams.get('snapshot') || 'live';
+
+    // Get the date string for the download link
+    const downloadId = currentSnapshot === 'live' && snapshots.length > 0
+        ? snapshots[0].id
+        : currentSnapshot;
 
     const handleRefresh = () => {
         startRefresh(async () => {
@@ -103,9 +108,21 @@ export default function DashboardContent({ data: { data, lastUpdated }, snapshot
                                     ))}
                                 </select>
                                 <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                                    <ChevronDown size={16} className="text-gray-400" />
+                                    <ChevronDown size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
                                 </div>
                             </div>
+
+                            {/* Download Button */}
+                            {downloadId && downloadId !== 'live' && (
+                                <a
+                                    href={`/api/download/${downloadId}`}
+                                    className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-500 hover:text-[#3D3DFF] hover:border-blue-100 shadow-xl shadow-gray-100/50 transition-all flex items-center justify-center group shrink-0"
+                                    title="Download Full Ticker Export (CSV)"
+                                    download
+                                >
+                                    <Download size={20} className="group-hover:scale-110 transition-transform" />
+                                </a>
+                            )}
 
                             <button
                                 onClick={handleRefresh}
