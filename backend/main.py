@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 # Constants
 RAW_BUCKET_NAME = os.environ.get('RAW_BUCKET_NAME', 'finviz-raw-data')
 BQ_DATASET = os.environ.get('BQ_DATASET', 'stock_data')
-BQ_TABLE = os.environ.get('BQ_TABLE', 'processed_stock_data')
+BQ_TABLE_BASE = os.environ.get('BQ_TABLE', 'processed_stock_data')
+BQ_TABLE_HISTORY = f"{BQ_TABLE_BASE}_history"
 FINVIZ_API_KEY = os.environ.get('FINVIZ_API_KEY')
 FINVIZ_API_URL = os.environ.get('FINVIZ_API_URL', 'https://elite.finviz.com/export.ashx')
 
@@ -32,23 +33,35 @@ def upload_to_gcs(bucket_name, destination_blob_name, data_string, content_type=
         logger.error(f"Failed to upload to GCS: {e}")
         raise
 
-def insert_into_bigquery(df, dataset_id, table_id):
+def insert_into_bigquery(df, dataset_id, table_id, write_disposition="WRITE_APPEND"):
     """Inserts a Pandas DataFrame into BigQuery."""
     try:
         client = bigquery.Client()
         table_ref = client.dataset(dataset_id).table(table_id)
         
         job_config = bigquery.LoadJobConfig(
-            write_disposition="WRITE_APPEND", # Accumulate historical data
-            autodetect=True, # Allow schema to expand with new views
+            write_disposition=write_disposition,
+            autodetect=True,
         )
         
         job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
         job.result() # Wait for completion
         logger.info(f"Loaded {len(df)} rows into {dataset_id}.{table_id}.")
     except Exception as e:
-        logger.error(f"Failed to insert into BigQuery: {e}")
+        logger.error(f"Failed to insert into BigQuery {table_id}: {e}")
         raise
+
+def set_all_historical(dataset_id, table_id):
+    """Sets is_current to 'no' for all existing rows in the cumulative table."""
+    try:
+        client = bigquery.Client()
+        query = f"UPDATE `{client.project}.{dataset_id}.{table_id}` SET is_current = 'no' WHERE is_current = 'yes'"
+        query_job = client.query(query)
+        query_job.result()
+        logger.info(f"Set all legacy records to is_current='no' in {table_id}.")
+    except Exception as e:
+        # If the table doesn't exist yet, we might get an error. Just log and continue.
+        logger.warning(f"Could not update is_current in {table_id} (might be new): {e}")
 
 @functions_framework.http
 def process_finviz_data(request):
@@ -134,19 +147,27 @@ def process_finviz_data(request):
         
         logger.info(f"Normalized columns: {df.columns.tolist()}")
         
-        # Add a timestamp
+        # Add a timestamp and current flag
         df['processed_at'] = pd.Timestamp.now()
+        df['is_current'] = 'yes'
         
         # Example Calculation: Volatility (if Price and Change are available)
-        # In a real scenario, you'd fetch more history for true Volatility.
-        # Here we just clean up values.
         if 'change' in df.columns:
             df['change_pct'] = df['change'].str.replace('%', '').astype(float)
         
-        # 4. Final Storage: Insert into BigQuery
-        insert_into_bigquery(df, BQ_DATASET, BQ_TABLE)
+        # 4. Final Storage: Layered approach
+        # 4a. Daily Table (WRITE_TRUNCATE because it's only for this day)
+        date_suffix = now.strftime('%Y%m%d')
+        daily_table = f"{BQ_TABLE_BASE}_{date_suffix}"
+        insert_into_bigquery(df, BQ_DATASET, daily_table, write_disposition="WRITE_TRUNCATE")
         
-        return f"Successfully processed {len(df)} tickers.", 200
+        # 4b. Cumulative/History Table
+        # Update existing records to is_current='no'
+        set_all_historical(BQ_DATASET, BQ_TABLE_HISTORY)
+        # Append new records
+        insert_into_bigquery(df, BQ_DATASET, BQ_TABLE_HISTORY, write_disposition="WRITE_APPEND")
+        
+        return f"Successfully processed {len(df)} tickers into {daily_table} and {BQ_TABLE_HISTORY}.", 200
 
     except Exception as e:
         logger.error(f"Error in data pipeline: {e}")
