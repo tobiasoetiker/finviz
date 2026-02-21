@@ -105,13 +105,13 @@ export default function ControlBar({
 
         if (ids.includes(id)) {
             newIds = ids.filter(i => i !== id);
-            if (newIds.length === 0) newIds = ['live'];
+            if (newIds.length === 0) newIds = [snapshots.length > 0 ? snapshots[0].id : ''];
         } else {
             if (ids.length >= 5) return; // Enforce max 5 points for sanity
             newIds = [...ids, id];
         }
 
-        updateParams({ snapshot: newIds.join(',') === 'live' ? null : newIds.sort().join(',') });
+        updateParams({ snapshot: newIds.sort().join(',') });
     };
 
     const selectedSnapshots = currentSnapshot.split(',');
@@ -187,10 +187,10 @@ export default function ControlBar({
                                     }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <History size={16} className={currentSnapshot !== 'live' ? 'text-blue-600' : 'text-slate-400'} />
+                                    <History size={16} className={selectedSnapshots.length > 1 ? 'text-blue-600' : 'text-slate-400'} />
                                     <span className="text-slate-700">
-                                        {selectedSnapshots.length === 1 && selectedSnapshots[0] === 'live'
-                                            ? 'Live Only'
+                                        {selectedSnapshots.length === 1
+                                            ? `${snapshots.find(s => s.id === selectedSnapshots[0])?.label.split(',')[0] || selectedSnapshots[0]}`
                                             : `${selectedSnapshots.length} Point${selectedSnapshots.length > 1 ? 's' : ''} Selected`}
                                     </span>
                                 </div>
@@ -203,21 +203,7 @@ export default function ControlBar({
                                         <p className="text-xs text-slate-500 font-semibold leading-relaxed text-center">Select up to 5 historical points to map trajectories over time.</p>
                                     </div>
 
-                                    <label className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer transition-colors group">
-                                        <div className="relative flex items-center justify-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedSnapshots.includes('live')}
-                                                onChange={() => handleSnapshotToggle('live')}
-                                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer appearance-none peer"
-                                            />
-                                            <div className="absolute inset-0 border border-slate-300 rounded peer-checked:bg-blue-600 peer-checked:border-blue-600 flex items-center justify-center pointer-events-none transition-colors">
-                                                {selectedSnapshots.includes('live') && <Check size={12} className="text-white" strokeWidth={3} />}
-                                            </div>
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Live Data</span>
-                                        {selectedSnapshots.includes('live') && <span className="ml-auto text-[10px] uppercase font-black tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Active</span>}
-                                    </label>
+
 
                                     {snapshots.map(s => {
                                         const isSelected = selectedSnapshots.includes(s.id);

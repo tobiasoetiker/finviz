@@ -25,7 +25,7 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const currentSnapshot = searchParams.get('snapshot') || 'live';
+    const currentSnapshot = searchParams.get('snapshot') || (snapshots.length > 0 ? snapshots[0].id : '');
     const groupBy = searchParams.get('groupBy') || 'sector';
     const currentSector = searchParams.get('sector') || 'all';
     const yAxis = searchParams.get('yAxis') || initialYAxis || 'week';

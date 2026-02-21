@@ -10,12 +10,15 @@ export default async function Home({ searchParams }: PageProps) {
   const { snapshot, groupBy, sector, industry, yAxis } = await searchParams;
   const groupByParam = (groupBy === 'industry' ? 'industry' : (groupBy === 'ticker' ? 'ticker' : 'sector')) as 'industry' | 'sector' | 'ticker';
 
+  // Fetch available snapshots first to determine the fallback default
+  const snapshots = await getAvailableSnapshots();
+  const defaultSnapshotId = snapshots.length > 0 ? snapshots[0].id : 'live';
+
   // Handle multiple snapshots (comma separated IDs)
-  const snapshotIds = snapshot ? snapshot.split(',') : ['live'];
+  const snapshotIds = snapshot ? snapshot.split(',') : [defaultSnapshotId];
 
   // Fetch data for all snapshots in parallel
-  const [snapshots, sectors, industries, ...multiData] = await Promise.all([
-    getAvailableSnapshots(),
+  const [sectors, industries, ...multiData] = await Promise.all([
     getAvailableSectors(snapshotIds[0]),
     getAvailableIndustries(snapshotIds[0], sector),
     ...snapshotIds.map(id => getIndustryPerformance(id === 'live' ? undefined : id, false, groupByParam, sector, industry))
