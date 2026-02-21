@@ -45,8 +45,8 @@ const SegmentedControl = ({
                         key={opt.value}
                         onClick={() => onChange(opt.value)}
                         className={`relative z-10 flex flex-1 items-center justify-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${isActive
-                                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                            ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
                             }`}
                     >
                         {opt.icon}
@@ -172,28 +172,17 @@ export default function ControlBar({
                         </ControlGroup>
                     </div>
 
-                    {/* Status indicator aligned right */}
-                    <div className="flex items-center gap-4 px-5 py-2 bg-blue-50/60 rounded-xl border border-blue-100/60 h-[42px] ml-auto hidden xl:flex">
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-blue-700">
-                            <Clock size={14} className="opacity-70" />
-                            <span className="tracking-tight uppercase">{currentSnapshot.includes('live') && selectedSnapshots.length === 1 ? 'Real-time Live Data' : 'Historical Data Analysis'}</span>
-                        </div>
-                        <div className="w-[1px] h-3 bg-blue-200/80" />
-                        <div className="text-[11px] text-blue-700 font-bold tracking-tight">
-                            Updated: {formattedDate}
-                        </div>
-                    </div>
                 </div>
 
-                {/* Bottom Row: Context Filtering & Time Travel Trajectories */}
-                <div className="flex flex-wrap items-end gap-6 pt-5 border-t border-slate-100/80">
+                {/* Middle Row: Time Travel Trajectories (Centered) */}
+                <div className="flex justify-center w-full pt-1">
                     <ControlGroup label="Time Travel (Trajectories)">
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className={`flex items-center justify-between gap-3 px-4 py-0 h-[42px] bg-white border rounded-xl text-sm font-bold shadow-sm transition-all min-w-[220px] ${isDropdownOpen
-                                        ? 'border-blue-400 ring-4 ring-blue-50'
-                                        : 'border-slate-200 hover:border-slate-300'
+                                className={`flex items-center justify-between gap-3 px-4 py-0 h-[42px] bg-white border rounded-xl text-sm font-bold shadow-sm transition-all min-w-[280px] ${isDropdownOpen
+                                    ? 'border-blue-400 ring-4 ring-blue-50'
+                                    : 'border-slate-200 hover:border-slate-300'
                                     }`}
                             >
                                 <div className="flex items-center gap-2">
@@ -208,9 +197,9 @@ export default function ControlBar({
                             </button>
 
                             {isDropdownOpen && (
-                                <div className="absolute top-[calc(100%+8px)] left-0 w-72 bg-white border border-slate-200 shadow-2xl rounded-2xl py-2 z-50 max-h-96 overflow-y-auto">
+                                <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl py-2 z-50 max-h-96 overflow-y-auto">
                                     <div className="px-4 pb-2 mb-2 border-b border-slate-100">
-                                        <p className="text-xs text-slate-500 font-semibold leading-relaxed">Select up to 5 historical points to map trajectories over time.</p>
+                                        <p className="text-xs text-slate-500 font-semibold leading-relaxed text-center">Select up to 5 historical points to map trajectories over time.</p>
                                     </div>
 
                                     <label className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50 cursor-pointer transition-colors group">
@@ -259,52 +248,70 @@ export default function ControlBar({
                             )}
                         </div>
                     </ControlGroup>
+                </div>
 
-                    {(groupBy === 'industry' || groupBy === 'ticker') && (
-                        <ControlGroup label="Filter Sector">
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                    <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                </div>
-                                <select
-                                    value={currentSector}
-                                    onChange={(e) => updateParams({ sector: e.target.value === 'all' ? null : e.target.value, industry: null })}
-                                    className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[200px]"
-                                >
-                                    <option value="all">All Sectors</option>
-                                    {sectors.map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                    <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                </div>
-                            </div>
-                        </ControlGroup>
-                    )}
+                {/* Bottom Row: Context Filtering */}
+                <div className="flex flex-wrap justify-between items-end gap-6 pt-5 border-t border-slate-100/80">
+                    <div className="flex flex-wrap items-center gap-6">
 
-                    {groupBy === 'ticker' && (
-                        <ControlGroup label="Filter Industry">
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                    <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                        {(groupBy === 'industry' || groupBy === 'ticker') && (
+                            <ControlGroup label="Filter Sector">
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                        <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
+                                    <select
+                                        value={currentSector}
+                                        onChange={(e) => updateParams({ sector: e.target.value === 'all' ? null : e.target.value, industry: null })}
+                                        className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[200px]"
+                                    >
+                                        <option value="all">All Sectors</option>
+                                        {sectors.map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                        <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
                                 </div>
-                                <select
-                                    value={currentIndustry}
-                                    onChange={(e) => updateParams({ industry: e.target.value === 'all' ? null : e.target.value })}
-                                    className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[240px]"
-                                >
-                                    <option value="all">All Industries</option>
-                                    {industries.map(i => (
-                                        <option key={i} value={i}>{i}</option>
-                                    ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                    <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                            </ControlGroup>
+                        )}
+
+                        {groupBy === 'ticker' && (
+                            <ControlGroup label="Filter Industry">
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                        <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
+                                    <select
+                                        value={currentIndustry}
+                                        onChange={(e) => updateParams({ industry: e.target.value === 'all' ? null : e.target.value })}
+                                        className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[240px]"
+                                    >
+                                        <option value="all">All Industries</option>
+                                        {industries.map(i => (
+                                            <option key={i} value={i}>{i}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                        <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
                                 </div>
-                            </div>
-                        </ControlGroup>
-                    )}
+                            </ControlGroup>
+                        )}
+                    </div>
+
+                    {/* Status indicator aligned to bottom right */}
+                    <div className="flex items-center justify-end gap-3 mt-4 sm:mt-0 xl:ml-auto">
+                        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400">
+                            <Clock size={12} className="opacity-60" />
+                            <span className="tracking-tight uppercase">{currentSnapshot.includes('live') && selectedSnapshots.length === 1 ? 'Real-time Live Data' : 'Historical Snapshot'}</span>
+                        </div>
+                        <div className="w-1 h-1 rounded-full bg-slate-200" />
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 font-bold tracking-tight">
+                            Updated: {formattedDate}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
