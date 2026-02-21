@@ -300,18 +300,6 @@ export default function ControlBar({
                             </ControlGroup>
                         )}
                     </div>
-
-                    {/* Status indicator aligned to bottom right */}
-                    <div className="flex items-center justify-end gap-3 mt-4 sm:mt-0 xl:ml-auto">
-                        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400">
-                            <Clock size={12} className="opacity-60" />
-                            <span className="tracking-tight uppercase">{currentSnapshot.includes('live') && selectedSnapshots.length === 1 ? 'Real-time Live Data' : 'Historical Snapshot'}</span>
-                        </div>
-                        <div className="w-1 h-1 rounded-full bg-slate-200" />
-                        <div className="text-[10px] sm:text-[11px] text-slate-400 font-bold tracking-tight">
-                            Updated: {formattedDate}
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
