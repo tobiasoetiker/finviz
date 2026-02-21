@@ -131,9 +131,15 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                                 <td className="px-6 py-4 text-left">
                                     <div className="flex flex-wrap gap-1.5">
                                         {item.topStocks?.map((stock: { ticker: string; week: number }) => (
-                                            <span key={stock.ticker} className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tighter hover:text-blue-600 hover:border-blue-200 transition-colors cursor-default">
+                                            <a
+                                                key={stock.ticker}
+                                                href={`https://elite.finviz.com/quote.ashx?t=${stock.ticker}&ty=c&r=m3&p=d&b=1`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tighter hover:text-blue-600 hover:border-blue-200 transition-colors cursor-pointer"
+                                            >
                                                 {stock.ticker}
-                                            </span>
+                                            </a>
                                         ))}
                                     </div>
                                 </td>
