@@ -20,7 +20,7 @@ interface Props {
 
 export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
-    const [showStrongOnly, setShowStrongOnly] = useState(false);
+    const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_weak'>('all');
     const [isRefreshing, startRefresh] = useTransition();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -48,7 +48,7 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
     }) : 'Never';
 
     // Transform data based on selection
-    const displayData = data.map(item => ({
+    let displayData = data.map(item => ({
         ...item,
         week: weighting === 'equal' ? item.weekEqual : item.week,
         month: weighting === 'equal' ? item.monthEqual : item.month,
@@ -56,13 +56,20 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
         rsi: weighting === 'equal' ? (item as any).rsiEqual : (item as any).rsi
     }));
 
+    if (momentumFocus === 'top10_momentum') {
+        displayData = [...displayData].sort((a, b) => b.momentum - a.momentum).slice(0, 10);
+    } else if (momentumFocus === 'top10_weak') {
+        // Weak performance = lowest weekly return
+        displayData = [...displayData].sort((a, b) => a.week - b.week).slice(0, 10);
+    }
+
     return (
         <div className="space-y-16">
             <ControlBar
                 weighting={weighting}
                 setWeighting={setWeighting}
-                showStrongOnly={showStrongOnly}
-                setShowStrongOnly={setShowStrongOnly}
+                momentumFocus={momentumFocus}
+                setMomentumFocus={setMomentumFocus}
                 currentSnapshot={currentSnapshot}
                 groupBy={groupBy}
                 currentSector={currentSector}
@@ -78,7 +85,7 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
             <div className="mt-16">
                 <h2 className="text-3xl font-bold text-black mb-10 text-center">Momentum & Performance Visualization</h2>
                 <MomentumMatrix
-                    data={showStrongOnly ? displayData.filter(d => d.momentum > 0) : displayData}
+                    data={displayData}
                     multiSnapshotData={multiSnapshotData}
                     weighting={weighting}
                     groupBy={groupBy as 'industry' | 'sector' | 'ticker'}

@@ -7,8 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 interface Props {
     weighting: 'weighted' | 'equal';
     setWeighting: (w: 'weighted' | 'equal') => void;
-    showStrongOnly: boolean;
-    setShowStrongOnly: (s: boolean) => void;
+    momentumFocus: 'all' | 'top10_momentum' | 'top10_weak';
+    setMomentumFocus: (s: 'all' | 'top10_momentum' | 'top10_weak') => void;
     currentSnapshot: string;
     groupBy: string;
     currentSector: string;
@@ -61,8 +61,8 @@ const SegmentedControl = ({
 export default function ControlBar({
     weighting,
     setWeighting,
-    showStrongOnly,
-    setShowStrongOnly,
+    momentumFocus,
+    setMomentumFocus,
     currentSnapshot,
     groupBy,
     currentSector,
@@ -161,13 +161,14 @@ export default function ControlBar({
                             />
                         </ControlGroup>
 
-                        <ControlGroup label="Momentum Focus">
+                        <ControlGroup label="Focus Highlights">
                             <SegmentedControl
-                                value={showStrongOnly ? 'strong' : 'all'}
-                                onChange={(val) => setShowStrongOnly(val === 'strong')}
+                                value={momentumFocus}
+                                onChange={(val) => setMomentumFocus(val as any)}
                                 options={[
                                     { value: 'all', label: 'Show All', icon: <LineChart size={14} /> },
-                                    { value: 'strong', label: 'Strong Only', icon: <Scale size={14} /> }
+                                    { value: 'top10_momentum', label: 'Top 10 Momentum', icon: <Scale size={14} /> },
+                                    { value: 'top10_weak', label: 'Weakest 10', icon: <Briefcase size={14} /> }
                                 ]}
                             />
                         </ControlGroup>
