@@ -18,6 +18,8 @@ interface Props {
     industries: string[];
     snapshots: { id: string; label: string; timestamp: number }[];
     formattedDate: string;
+    rsiRange: [number, number];
+    setRsiRange: (range: [number, number]) => void;
 }
 
 const ControlGroup = ({ label, children }: { label: string, children: React.ReactNode }) => (
@@ -71,7 +73,9 @@ export default function ControlBar({
     sectors,
     industries,
     snapshots,
-    formattedDate
+    formattedDate,
+    rsiRange,
+    setRsiRange
 }: Props) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -171,6 +175,34 @@ export default function ControlBar({
                                     { value: 'top10_performance', label: 'Top 10 Performance', icon: <Briefcase size={14} /> }
                                 ]}
                             />
+                        </ControlGroup>
+
+                        <ControlGroup label="RSI Filter (14)">
+                            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl h-[42px]">
+                                <div className="flex items-center gap-1.5 px-3">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">From</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={rsiRange[0]}
+                                        onChange={(e) => setRsiRange([parseInt(e.target.value) || 0, rsiRange[1]])}
+                                        className="w-12 bg-white border border-slate-200 rounded-lg py-1 px-1.5 text-xs font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    />
+                                </div>
+                                <div className="w-px h-4 bg-slate-200" />
+                                <div className="flex items-center gap-1.5 px-3">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">To</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={rsiRange[1]}
+                                        onChange={(e) => setRsiRange([rsiRange[0], parseInt(e.target.value) || 0])}
+                                        className="w-12 bg-white border border-slate-200 rounded-lg py-1 px-1.5 text-xs font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    />
+                                </div>
+                            </div>
                         </ControlGroup>
                     </div>
 

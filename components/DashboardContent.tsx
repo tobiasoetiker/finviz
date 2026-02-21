@@ -21,6 +21,7 @@ interface Props {
 export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
+    const [rsiRange, setRsiRange] = useState<[number, number]>([0, 100]);
     const [isRefreshing, startRefresh] = useTransition();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -56,6 +57,12 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
         rsi: weighting === 'equal' ? (item as any).rsiEqual : (item as any).rsi
     }));
 
+    // Apply RSI Filtering
+    displayData = displayData.filter(item => {
+        const rsiVal = item.rsi || 0;
+        return rsiVal >= rsiRange[0] && rsiVal <= rsiRange[1];
+    });
+
     if (momentumFocus === 'top10_momentum') {
         displayData = [...displayData].sort((a, b) => b.momentum - a.momentum).slice(0, 10);
     } else if (momentumFocus === 'top10_performance') {
@@ -79,6 +86,8 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                 industries={industries}
                 snapshots={snapshots}
                 formattedDate={formattedDate}
+                rsiRange={rsiRange}
+                setRsiRange={setRsiRange}
             />
 
             {/* Momentum Matrix Visualization Section */}
