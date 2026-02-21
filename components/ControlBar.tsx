@@ -175,8 +175,8 @@ export default function ControlBar({
 
                 </div>
 
-                {/* Middle Row: Time Travel Trajectories (Centered) */}
-                <div className="flex justify-center w-full pt-1">
+                {/* Bottom Row: Context & Time Trajectories */}
+                <div className="flex flex-wrap items-end gap-6 pt-5 border-t border-slate-100/80">
                     <ControlGroup label="Time Travel (Trajectories)">
                         <div className="relative" ref={dropdownRef}>
                             <button
@@ -198,7 +198,7 @@ export default function ControlBar({
                             </button>
 
                             {isDropdownOpen && (
-                                <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl py-2 z-50 max-h-96 overflow-y-auto">
+                                <div className="absolute top-[calc(100%+8px)] left-0 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl py-2 z-50 max-h-96 overflow-y-auto">
                                     <div className="px-4 pb-2 mb-2 border-b border-slate-100">
                                         <p className="text-xs text-slate-500 font-semibold leading-relaxed text-center">Select up to 5 historical points to map trajectories over time.</p>
                                     </div>
@@ -249,58 +249,52 @@ export default function ControlBar({
                             )}
                         </div>
                     </ControlGroup>
-                </div>
 
-                {/* Bottom Row: Context Filtering */}
-                <div className="flex flex-wrap justify-between items-end gap-6 pt-5 border-t border-slate-100/80">
-                    <div className="flex flex-wrap items-center gap-6">
-
-                        {(groupBy === 'industry' || groupBy === 'ticker') && (
-                            <ControlGroup label="Filter Sector">
-                                <div className="relative group">
-                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                        <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                    </div>
-                                    <select
-                                        value={currentSector}
-                                        onChange={(e) => updateParams({ sector: e.target.value === 'all' ? null : e.target.value, industry: null })}
-                                        className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[200px]"
-                                    >
-                                        <option value="all">All Sectors</option>
-                                        {sectors.map(s => (
-                                            <option key={s} value={s}>{s}</option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                        <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                    </div>
+                    {(groupBy === 'industry' || groupBy === 'ticker') && (
+                        <ControlGroup label="Filter Sector">
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                    <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
                                 </div>
-                            </ControlGroup>
-                        )}
-
-                        {(groupBy === 'industry' || groupBy === 'ticker') && (
-                            <ControlGroup label="Filter Industry">
-                                <div className="relative group">
-                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                        <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                    </div>
-                                    <select
-                                        value={currentIndustry}
-                                        onChange={(e) => updateParams({ industry: e.target.value === 'all' ? null : e.target.value })}
-                                        className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[240px]"
-                                    >
-                                        <option value="all">All Industries</option>
-                                        {industries.map(i => (
-                                            <option key={i} value={i}>{i}</option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                        <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                    </div>
+                                <select
+                                    value={currentSector}
+                                    onChange={(e) => updateParams({ sector: e.target.value === 'all' ? null : e.target.value, industry: null })}
+                                    className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[200px]"
+                                >
+                                    <option value="all">All Sectors</option>
+                                    {sectors.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                    <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
                                 </div>
-                            </ControlGroup>
-                        )}
-                    </div>
+                            </div>
+                        </ControlGroup>
+                    )}
+
+                    {(groupBy === 'industry' || groupBy === 'ticker') && (
+                        <ControlGroup label="Filter Industry">
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                    <Filter size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                </div>
+                                <select
+                                    value={currentIndustry}
+                                    onChange={(e) => updateParams({ industry: e.target.value === 'all' ? null : e.target.value })}
+                                    className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[240px]"
+                                >
+                                    <option value="all">All Industries</option>
+                                    {industries.map(i => (
+                                        <option key={i} value={i}>{i}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                    <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                </div>
+                            </div>
+                        </ControlGroup>
+                    )}
                 </div>
             </div>
         </div>
