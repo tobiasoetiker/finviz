@@ -127,8 +127,9 @@ export default function ControlBar({
                             <SegmentedControl
                                 value={groupBy}
                                 onChange={(val) => {
-                                    if (val === 'sector') updateParams({ groupBy: 'sector', sector: null, industry: null });
-                                    else updateParams({ groupBy: val === 'industry' ? null : val });
+                                    if (val === 'sector') updateParams({ groupBy: null, sector: null, industry: null });
+                                    else if (val === 'industry') updateParams({ groupBy: 'industry', industry: null });
+                                    else updateParams({ groupBy: 'ticker' });
                                 }}
                                 options={[
                                     { value: 'sector', label: 'Sector', icon: <PieChart size={14} /> },
