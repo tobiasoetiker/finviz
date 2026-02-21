@@ -8,11 +8,12 @@ import { formatPercent, formatMoney } from '@/lib/formatters';
 interface Props {
     data: GroupPerformance[];
     title?: string;
+    groupBy?: string;
 }
 
 type SortKey = 'name' | 'week' | 'month' | 'momentum' | 'marketCap';
 
-export default function PerformanceTable({ data, title = 'Industry Performance' }: Props) {
+export default function PerformanceTable({ data, title = 'Industry Performance', groupBy = 'industry' }: Props) {
     const [sortKey, setSortKey] = useState<SortKey>('momentum');
     const [sortDesc, setSortDesc] = useState(true);
     const [filter, setFilter] = useState('');
@@ -71,7 +72,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                     </div>
                     <input
                         type="text"
-                        placeholder="Search industries..."
+                        placeholder={`Search ${groupBy === 'ticker' ? 'stocks' : (groupBy === 'sector' ? 'sectors' : 'industries')}...`}
                         className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg leading-5 bg-slate-50 text-slate-600 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all shadow-sm"
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
@@ -107,7 +108,18 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                         {sortedData.map((item: GroupPerformance) => (
                             <tr key={item.name} className="hover:bg-slate-50/80 transition-colors group">
                                 <th scope="row" className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap max-w-[200px] truncate" title={item.name}>
-                                    {item.name}
+                                    {groupBy === 'ticker' ? (
+                                        <a
+                                            href={`https://elite.finviz.com/quote.ashx?t=${item.name}&ty=c&r=m3&p=d&b=1`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 hover:underline transition-colors font-bold"
+                                        >
+                                            {item.name}
+                                        </a>
+                                    ) : (
+                                        item.name
+                                    )}
                                 </th>
                                 <td className="px-6 py-4 text-right text-slate-500 font-mono text-xs relative">
                                     {/* Visual Bar Background */}

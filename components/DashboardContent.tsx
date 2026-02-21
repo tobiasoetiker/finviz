@@ -93,10 +93,16 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                 />
             </div>
 
-            {/* Full Industry Breakdown Table */}
-            <div className="pt-24 border-t border-gray-100 mt-24">
-                <h2 className="text-4xl font-bold mb-10">Full {groupBy === 'sector' ? 'Sector' : 'Industry'} Breakdown</h2>
-                <PerformanceTable data={displayData} title={groupBy === 'sector' ? 'Sector Performance' : 'Industry Performance'} />
+            {/* Full Breakdown Table */}
+            <div className="pt-24 border-t border-slate-100 mt-24">
+                <h2 className="text-4xl font-bold mb-10 text-slate-900 tracking-tight">
+                    Full {groupBy === 'ticker' ? 'Stock' : (groupBy === 'sector' ? 'Sector' : 'Industry')} Breakdown
+                </h2>
+                <PerformanceTable
+                    data={displayData}
+                    title={groupBy === 'ticker' ? 'Stock Performance' : (groupBy === 'sector' ? 'Sector Performance' : 'Industry Performance')}
+                    groupBy={groupBy as string}
+                />
             </div>
 
             {/* Decorative element moved inside the container for better positioning */}
