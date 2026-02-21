@@ -8,6 +8,7 @@ import io
 from datetime import datetime
 from google.cloud import storage
 from google.cloud import bigquery
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,6 +64,126 @@ def set_all_historical(dataset_id, table_id):
         # If the table doesn't exist yet, we might get an error. Just log and continue.
         logger.warning(f"Could not update is_current in {table_id} (might be new): {e}")
 
+def aggregate_current_data(dataset_id, base_table_name):
+    """Aggregates the current snapshot and appends to the industry and sector history tables."""
+    try:
+        client = bigquery.Client()
+        project_id = client.project
+        raw_table = f"{project_id}.{dataset_id}.{base_table_name}_history"
+        industry_table = f"{project_id}.{dataset_id}.{base_table_name}_industry_history"
+        sector_table = f"{project_id}.{dataset_id}.{base_table_name}_sector_history"
+        
+        # 1. Set current='no' in aggregate tables
+        for table in [industry_table, sector_table]:
+            try:
+                client.query(f"UPDATE `{table}` SET is_current = 'no' WHERE is_current = 'yes'").result()
+            except Exception as e:
+                logger.warning(f"Could not update is_current in {table}: {e}")
+                
+        # 2. Insert Industry Aggregation
+        query_industry = f"""
+        INSERT INTO `{industry_table}`
+        WITH raw_data AS (
+            SELECT 
+                industry, sector, processed_at, is_current, ticker,
+                SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
+                SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
+                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
+            FROM `{raw_table}`
+            WHERE is_current = 'yes'
+        )
+        SELECT 
+            CAST(processed_at AS STRING) as snapshot_id, MAX(processed_at) as processed_at, 'yes' as is_current,
+            industry as name, ANY_VALUE(sector) as parent_sector,
+            SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
+            SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
+            SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
+            (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
+            AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
+            SUM(mcap) as marketCap, COUNT(*) as stockCount,
+            ARRAY_AGG(STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5) as topStocks
+        FROM raw_data WHERE industry IS NOT NULL GROUP BY CAST(processed_at AS STRING), industry
+        """
+        client.query(query_industry).result()
+        logger.info(f"Appended current industry aggregation to {industry_table}.")
+        
+        # 3. Insert Sector Aggregation
+        query_sector = f"""
+        INSERT INTO `{sector_table}`
+        WITH raw_data AS (
+            SELECT 
+                sector, processed_at, is_current, ticker,
+                SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
+                SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
+                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
+            FROM `{raw_table}`
+            WHERE is_current = 'yes'
+        )
+        SELECT 
+            CAST(processed_at AS STRING) as snapshot_id, MAX(processed_at) as processed_at, 'yes' as is_current,
+            sector as name, CAST(NULL as STRING) as parent_sector,
+            SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
+            SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
+            SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
+            (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
+            AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
+            SUM(mcap) as marketCap, COUNT(*) as stockCount,
+            ARRAY_AGG(STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5) as topStocks
+        FROM raw_data WHERE sector IS NOT NULL GROUP BY CAST(processed_at AS STRING), sector
+        """
+        client.query(query_sector).result()
+        logger.info(f"Appended current sector aggregation to {sector_table}.")
+        
+    except Exception as e:
+        logger.error(f"Failed to aggregate current data: {e}")
+        raise
+
+def fetch_view(view_name, view_id, filter_param, api_url, api_key):
+    """Renames columns to be BigQuery friendly."""
+    import re
+    # Lowercase, replace special chars with _, strip leading/trailing underscores
+    df.columns = [re.sub(r'[^a-z0-9_]', '_', c.lower()).strip('_') for c in df.columns]
+    # Avoid double underscores
+    df.columns = [re.sub(r'_{2,}', '_', c) for c in df.columns]
+    return df
+
+def _log_retry(retry_state):
+    logger.warning(f"Retrying Finviz fetch after exception (attempt {retry_state.attempt_number}): {retry_state.outcome.exception()}")
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=4, max=60),
+    retry=retry_if_exception_type(Exception),
+    before_sleep=_log_retry,
+    reraise=True
+)
+def fetch_view_api(url, view_name):
+    """Fetches Finviz view with exponential backoff on any exception."""
+    response = requests.get(url, timeout=30)
+    
+    # Let requests handle raising HTTP parsing errors
+    response.raise_for_status()
+    
+    # Catch empty responses which occur occasionally on FinViz timeout
+    if not response.text or len(response.text.strip()) == 0:
+         raise ValueError(f"View {view_name} returned an empty payload.")
+         
+    df = pd.read_csv(io.StringIO(response.text))
+    if df.empty:
+        raise ValueError(f"View {view_name} returned a CSV with no visible rows.")
+    return df
+
+def fetch_view(view_name, view_id, filter_param, api_url, api_key):
+    """Entry point for fetching a Finviz View. Will hard crash the flow if it fails after all retries."""
+    url = f"{api_url}?v={view_id}&f={filter_param}&auth={api_key}"
+    logger.info(f"Fetching view: {view_name} (v={view_id})...")
+    
+    # We let tenacity handle the retry and simply bubble up the Exception if it ultimately fails
+    return fetch_view_api(url, view_name)
+
+
 @functions_framework.http
 def process_finviz_data(request):
     """Cloud Function entry point."""
@@ -76,8 +197,7 @@ def process_finviz_data(request):
         if not FINVIZ_API_KEY:
             raise ValueError("FINVIZ_API_KEY environment variable is not set.")
 
-        # List of views to fetch and merge, similar to the Next.js app
-        # v=111: Overview, v=121: Valuation, v=161: Financial, v=141: Performance, v=171: Technical, v=152: Custom
+        # List of views to fetch and merge
         views = [
             ('overview', '111'),
             ('valuation', '121'),
@@ -92,28 +212,9 @@ def process_finviz_data(request):
 
         import time
         for view_name, view_id in views:
-            logger.info(f"Fetching view: {view_name} (v={view_id})...")
-            url = f"{FINVIZ_API_URL}?v={view_id}&f={filter_param}&auth={FINVIZ_API_KEY}"
+            df_view = fetch_view(view_name, view_id, filter_param, FINVIZ_API_URL, FINVIZ_API_KEY)
             
-            # Simple retry logic with delay
-            retries = 3
-            for attempt in range(retries):
-                try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    break
-                except requests.exceptions.HTTPError as e:
-                    if response.status_code == 429 and attempt < retries - 1:
-                        wait_time = (attempt + 1) * 2
-                        logger.warning(f"Rate limited (429). Waiting {wait_time}s...")
-                        time.sleep(wait_time)
-                        continue
-                    raise e
-
-            df_view = pd.read_csv(io.StringIO(response.text))
-            # Add a small delay between views to avoid rate limits
-            time.sleep(1)
-            
+            # Since fetch_view now raises on permanent failure, if we get here we have valid data.
             if merged_df is None:
                 merged_df = df_view
             else:
@@ -121,6 +222,9 @@ def process_finviz_data(request):
                 cols_to_use = df_view.columns.difference(merged_df.columns).tolist()
                 cols_to_use.append('Ticker')
                 merged_df = pd.merge(merged_df, df_view[cols_to_use], on='Ticker', how='outer')
+            
+            # Add a small delay between views to avoid rate limits
+            time.sleep(2)
 
         if merged_df is None or merged_df.empty:
             logger.warning("No data fetched from FinViz views.")
@@ -133,17 +237,7 @@ def process_finviz_data(request):
         
         # 3. Transformation: Process the raw data
         logger.info("Starting data transformation...")
-        
-        # Basic calculations
-        # SMA 20, 50, 200 are often already in FinViz data if you use specific views, 
-        # but let's assume we want to calculate some simple things if they aren't there.
-        # For simplicity, we'll just ensure the output has what we need.
-        
-        # Rename columns to be BigQuery friendly (no spaces, etc.)
-        import re
-        df.columns = [re.sub(r'[^a-z0-9_]', '_', c.lower()).strip('_') for c in df.columns]
-        # Avoid double underscores
-        df.columns = [re.sub(r'_{2,}', '_', c) for c in df.columns]
+        df = normalize_columns(df)
         
         logger.info(f"Normalized columns: {df.columns.tolist()}")
         
@@ -166,6 +260,9 @@ def process_finviz_data(request):
         set_all_historical(BQ_DATASET, BQ_TABLE_HISTORY)
         # Append new records
         insert_into_bigquery(df, BQ_DATASET, BQ_TABLE_HISTORY, write_disposition="WRITE_APPEND")
+        
+        # 4c. Pre-calculate aggregations into historical tables
+        aggregate_current_data(BQ_DATASET, BQ_TABLE_BASE)
         
         return f"Successfully processed {len(df)} tickers into {daily_table} and {BQ_TABLE_HISTORY}.", 200
 

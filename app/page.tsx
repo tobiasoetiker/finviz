@@ -1,29 +1,41 @@
 import DashboardContent from '@/components/DashboardContent';
-import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors } from '@/lib/finviz';
-
-export const dynamic = 'force-dynamic';
+import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, getAvailableIndustries } from '@/lib/finviz';
+import { IndustryApiResponse } from '@/types';
 
 interface PageProps {
-  searchParams: Promise<{ snapshot?: string, groupBy?: string, sector?: string }>;
+  searchParams: Promise<{ snapshot?: string, groupBy?: string, sector?: string, industry?: string, yAxis?: string }>;
 }
 
 export default async function Home({ searchParams }: PageProps) {
-  const { snapshot, groupBy, sector } = await searchParams;
-  const snapshotId = snapshot;
-  const groupByParam = (groupBy === 'sector' ? 'sector' : 'industry') as 'industry' | 'sector';
+  const { snapshot, groupBy, sector, industry, yAxis } = await searchParams;
+  const groupByParam = (groupBy === 'sector' ? 'sector' : (groupBy === 'ticker' ? 'ticker' : 'industry')) as 'industry' | 'sector' | 'ticker';
 
-  const [data, snapshots, sectors] = await Promise.all([
-    getIndustryPerformance(snapshotId, false, groupByParam, sector),
+  // Handle multiple snapshots (comma separated IDs)
+  const snapshotIds = snapshot ? snapshot.split(',') : ['live'];
+
+  // Fetch data for all snapshots in parallel
+  const [snapshots, sectors, industries, ...multiData] = await Promise.all([
     getAvailableSnapshots(),
-    getAvailableSectors(snapshotId)
+    getAvailableSectors(snapshotIds[0]),
+    getAvailableIndustries(snapshotIds[0], sector),
+    ...snapshotIds.map(id => getIndustryPerformance(id === 'live' ? undefined : id, false, groupByParam, sector, industry))
   ]);
+
+  // Create a mapping of snapshot ID to data
+  const multiSnapshotData: Record<string, IndustryApiResponse> = {};
+  snapshotIds.forEach((id, index) => {
+    multiSnapshotData[id] = multiData[index];
+  });
 
   return (
     <main className="min-h-screen bg-white">
       <DashboardContent
-        data={data}
+        data={multiData[multiData.length - 1]} // Use the last selected snapshot as primary data
+        multiSnapshotData={multiSnapshotData}
         snapshots={snapshots}
         sectors={sectors}
+        industries={industries}
+        yAxis={yAxis}
       />
     </main>
   );

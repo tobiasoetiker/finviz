@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "set NODE_OPTIONS=--no-deprecation && next dev --turbo",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.19.0",
     "@google-cloud/bigquery": "^7.9.0",
+    "@google-cloud/storage": "^7.19.0",
     "axios": "^1.13.5",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.3.1",
@@ -18,7 +18,8 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -17,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${outfit.className} antialiased min-h-screen flex flex-col`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${outfit.className} antialiased min-h-screen flex flex-col`} suppressHydrationWarning>
         <Navbar />
         <main className="flex-grow pv-container py-6">
           {children}

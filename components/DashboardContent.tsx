@@ -1,34 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { IndustryApiResponse } from '@/types';
+import { refreshMarketData } from '@/lib/finviz';
 import PerformanceTable from './PerformanceTable';
 import MomentumMatrix from './MomentumMatrix';
 import MarketMonitor from './MarketMonitor';
-import { LayoutGrid, Scale, Clock, History, ChevronDown, RefreshCw, Download, Briefcase, PieChart, Filter } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { refreshMarketData } from '@/lib/finviz';
-import { useTransition } from 'react';
+import ControlBar from './ControlBar';
 
 interface Props {
     data: IndustryApiResponse;
+    multiSnapshotData?: Record<string, IndustryApiResponse>;
     snapshots: { id: string; label: string; timestamp: number }[];
     sectors?: string[];
+    industries?: string[];
+    yAxis?: string;
 }
 
-export default function DashboardContent({ data: { data, lastUpdated }, snapshots, sectors = [] }: Props) {
+export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
+    const [showStrongOnly, setShowStrongOnly] = useState(false);
     const [isRefreshing, startRefresh] = useTransition();
     const router = useRouter();
     const searchParams = useSearchParams();
+
     const currentSnapshot = searchParams.get('snapshot') || 'live';
     const groupBy = searchParams.get('groupBy') || 'industry';
     const currentSector = searchParams.get('sector') || 'all';
-
-    // Get the date string for the download link
-    const downloadId = currentSnapshot === 'live' && snapshots.length > 0
-        ? snapshots[0].id
-        : currentSnapshot;
+    const yAxis = searchParams.get('yAxis') || initialYAxis || 'week';
 
     const handleRefresh = () => {
         startRefresh(async () => {
@@ -52,164 +52,38 @@ export default function DashboardContent({ data: { data, lastUpdated }, snapshot
         ...item,
         week: weighting === 'equal' ? item.weekEqual : item.week,
         month: weighting === 'equal' ? item.monthEqual : item.month,
-        momentum: weighting === 'equal' ? item.momentumEqual : item.momentum
+        momentum: weighting === 'equal' ? item.momentumEqual : item.momentum,
+        rsi: weighting === 'equal' ? (item as any).rsiEqual : (item as any).rsi
     }));
 
     return (
         <div className="space-y-16">
-            {/* Control Bar: Weighting & Snapshot History */}
-            <div className="flex flex-col items-center justify-center gap-8 py-8">
-
-                <div className="flex flex-wrap items-center justify-center gap-10">
-                    {/* Performance Model Toggle */}
-                    <div className="flex flex-col items-center gap-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Performance Model</label>
-                        <div className="bg-white p-1 rounded-2xl flex items-center gap-1 border border-gray-100 shadow-xl shadow-gray-100/50">
-                            <button
-                                onClick={() => setWeighting('weighted')}
-                                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${weighting === 'weighted'
-                                    ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
-                                    : 'text-gray-500 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <Scale size={18} />
-                                Market-Cap
-                            </button>
-                            <button
-                                onClick={() => setWeighting('equal')}
-                                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${weighting === 'equal'
-                                    ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
-                                    : 'text-gray-500 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <LayoutGrid size={18} />
-                                Equal Weight
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Grouping Toggle (Industry vs Sector) */}
-                    <div className="flex flex-col items-center gap-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Grouping</label>
-                        <div className="bg-white p-1 rounded-2xl flex items-center gap-1 border border-gray-100 shadow-xl shadow-gray-100/50">
-                            <button
-                                onClick={() => {
-                                    const params = new URLSearchParams(searchParams.toString());
-                                    params.set('groupBy', 'industry');
-                                    // Keep sector filter if it exists, or maybe clear it? Keeping it seems fine if it's relevant. 
-                                    // Actually if switching to Industry, we might want to see all or keep the filter. 
-                                    // If switching to Sector, the filter is hidden anyway.
-                                    router.push(`/?${params.toString()}`);
-                                }}
-                                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'industry'
-                                    ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
-                                    : 'text-gray-500 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <Briefcase size={18} />
-                                Industry
-                            </button>
-                            <button
-                                onClick={() => {
-                                    const params = new URLSearchParams(searchParams.toString());
-                                    params.set('groupBy', 'sector');
-                                    params.delete('sector'); // Clear sector filter when viewing sectors
-                                    router.push(`/?${params.toString()}`);
-                                }}
-                                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'sector'
-                                    ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
-                                    : 'text-gray-500 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <PieChart size={18} />
-                                Sector
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Sector Filter (Only visible when grouping by Industry) */}
-                    {groupBy === 'industry' && (
-                        <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Filter Sector</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                    <Filter size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
-                                </div>
-                                <select
-                                    value={currentSector}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        const params = new URLSearchParams(searchParams.toString());
-                                        if (val === 'all') params.delete('sector');
-                                        else params.set('sector', val);
-                                        router.push(`/?${params.toString()}`);
-                                    }}
-                                    className="pl-12 pr-10 py-3.5 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-xl shadow-gray-100/50 appearance-none cursor-pointer hover:border-blue-100 transition-all outline-none focus:ring-2 focus:ring-blue-50 max-w-[200px]"
-                                >
-                                    <option value="all">All Sectors</option>
-                                    {sectors.map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                                    <ChevronDown size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Snapshot History Selector */}
-                    <div className="flex flex-col items-center gap-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Fetching Point</label>
-                        <div className="flex items-center gap-4">
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                    <History size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
-                                </div>
-                                <select
-                                    value={currentSnapshot}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val === 'live') router.push('/');
-                                        else router.push(`/?snapshot=${val}`);
-                                    }}
-                                    className="pl-12 pr-10 py-3.5 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-xl shadow-gray-100/50 appearance-none cursor-pointer hover:border-blue-100 transition-all outline-none focus:ring-2 focus:ring-blue-50"
-                                >
-                                    <option value="live">Live / Latest Data</option>
-                                    {snapshots.map(s => (
-                                        <option key={s.id} value={s.id}>{s.label}</option>
-                                    ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                                    <ChevronDown size={16} className="text-gray-400 group-hover:text-[#3D3DFF] transition-colors" />
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-6 py-2 px-6 bg-[#3D3DFF]/5 rounded-full border border-[#3D3DFF]/10 group">
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-[#3D3DFF] transition-colors">
-                        <Clock size={14} className="opacity-70" />
-                        <span>State: <span className="font-black tracking-tight uppercase">{currentSnapshot === 'live' ? 'Real-time' : 'Historical Snapshot'}</span></span>
-                    </div>
-                    <div className="w-[1px] h-3 bg-[#3D3DFF]/20" />
-                    <div className="text-[11px] text-[#3D3DFF] font-bold tracking-tight">
-                        Updated: {formattedDate}
-                    </div>
-                </div>
-            </div>
+            <ControlBar
+                weighting={weighting}
+                setWeighting={setWeighting}
+                showStrongOnly={showStrongOnly}
+                setShowStrongOnly={setShowStrongOnly}
+                currentSnapshot={currentSnapshot}
+                groupBy={groupBy}
+                currentSector={currentSector}
+                currentIndustry={searchParams.get('industry') || 'all'}
+                yAxis={yAxis}
+                sectors={sectors}
+                industries={industries}
+                snapshots={snapshots}
+                formattedDate={formattedDate}
+            />
 
             {/* Momentum Matrix Visualization Section */}
             <div className="mt-16">
                 <h2 className="text-3xl font-bold text-black mb-10 text-center">Momentum & Performance Visualization</h2>
-                <MomentumMatrix data={displayData} groupBy={groupBy as 'industry' | 'sector'} />
-            </div>
-
-            {/* Market Monitor - High Level Overview */}
-            <div className="mt-24">
-                <MarketMonitor data={displayData} groupBy={groupBy as 'industry' | 'sector'} />
+                <MomentumMatrix
+                    data={showStrongOnly ? displayData.filter(d => d.momentum > 0) : displayData}
+                    multiSnapshotData={multiSnapshotData}
+                    weighting={weighting}
+                    groupBy={groupBy as 'industry' | 'sector' | 'ticker'}
+                    yAxis={yAxis as 'week' | 'rsi'}
+                />
             </div>
 
             {/* Full Industry Breakdown Table */}

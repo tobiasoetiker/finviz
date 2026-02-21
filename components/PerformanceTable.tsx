@@ -3,6 +3,7 @@
 import { GroupPerformance } from '@/types';
 import { useState } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from 'lucide-react';
+import { formatPercent, formatMoney } from '@/lib/formatters';
 
 interface Props {
     data: GroupPerformance[];
@@ -28,7 +29,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
             return sortDesc ? valB.localeCompare(valA) : valA.localeCompare(valB);
         }
 
-        return sortDesc ? (valB as number) - (valA as number) : (valA as number) - (valB as number);
+        return sortDesc ? (Number(valB) || 0) - (Number(valA) || 0) : (Number(valA) || 0) - (Number(valB) || 0);
     });
 
     const handleSort = (key: SortKey) => {
@@ -43,20 +44,6 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
     const SortIcon = ({ column }: { column: SortKey }) => {
         if (sortKey !== column) return <ArrowUpDown size={14} className="text-slate-300" />;
         return sortDesc ? <ArrowDown size={14} className="text-blue-600" /> : <ArrowUp size={14} className="text-blue-600" />;
-    };
-
-    const formatPercent = (val: number | null | undefined) => {
-        if (val === null || val === undefined) return '-';
-        return `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
-    };
-
-    const formatMoney = (val: number | null | undefined) => {
-        if (val === null || val === undefined) return '-';
-        if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
-        if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
-        if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
-        if (val >= 1e3) return `$${(val / 1e3).toFixed(2)}K`;
-        return `$${val.toFixed(2)}`;
     };
 
     // Calculate max market cap for bar visualization
@@ -117,7 +104,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {sortedData.map((item) => (
+                        {sortedData.map((item: GroupPerformance) => (
                             <tr key={item.name} className="hover:bg-slate-50/80 transition-colors group">
                                 <th scope="row" className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap max-w-[200px] truncate" title={item.name}>
                                     {item.name}
@@ -143,7 +130,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance' 
                                 </td>
                                 <td className="px-6 py-4 text-left">
                                     <div className="flex flex-wrap gap-1.5">
-                                        {item.topStocks?.map((stock) => (
+                                        {item.topStocks?.map((stock: { ticker: string; week: number }) => (
                                             <span key={stock.ticker} className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tighter hover:text-blue-600 hover:border-blue-200 transition-colors cursor-default">
                                                 {stock.ticker}
                                             </span>
