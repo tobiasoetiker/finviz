@@ -81,16 +81,6 @@ export default function ControlBar({
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Grouping</label>
                     <div className="bg-white p-1 rounded-2xl flex items-center gap-1 border border-gray-100 shadow-xl shadow-gray-100/50">
                         <button
-                            onClick={() => updateParams({ groupBy: 'industry' })}
-                            className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'industry'
-                                ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
-                                : 'text-gray-500 hover:bg-gray-50'
-                                }`}
-                        >
-                            <Briefcase size={18} />
-                            Industry
-                        </button>
-                        <button
                             onClick={() => updateParams({ groupBy: 'sector', sector: null, industry: null })}
                             className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'sector'
                                 ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
@@ -99,6 +89,16 @@ export default function ControlBar({
                         >
                             <PieChart size={18} />
                             Sector
+                        </button>
+                        <button
+                            onClick={() => updateParams({ groupBy: 'industry' })}
+                            className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2.5 ${groupBy === 'industry'
+                                ? 'bg-[#3D3DFF] text-white shadow-lg shadow-blue-100'
+                                : 'text-gray-500 hover:bg-gray-50'
+                                }`}
+                        >
+                            <Briefcase size={18} />
+                            Industry
                         </button>
                         <button
                             onClick={() => updateParams({ groupBy: 'ticker' })}

@@ -8,7 +8,7 @@ interface PageProps {
 
 export default async function Home({ searchParams }: PageProps) {
   const { snapshot, groupBy, sector, industry, yAxis } = await searchParams;
-  const groupByParam = (groupBy === 'sector' ? 'sector' : (groupBy === 'ticker' ? 'ticker' : 'industry')) as 'industry' | 'sector' | 'ticker';
+  const groupByParam = (groupBy === 'industry' ? 'industry' : (groupBy === 'ticker' ? 'ticker' : 'sector')) as 'industry' | 'sector' | 'ticker';
 
   // Handle multiple snapshots (comma separated IDs)
   const snapshotIds = snapshot ? snapshot.split(',') : ['live'];

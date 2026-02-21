@@ -41,7 +41,7 @@ const CustomTooltip = ({ active, payload, yAxis_ }: any) => {
             </span>
           </p>
           <p className="text-gray-400 text-[10px] mt-1 italic">
-            {data.stockCount} companies
+            {data.stockCount} companies {data.isHistorical && <span className="text-[#3D3DFF] font-semibold ml-1">• {data.dateLabel}</span>}
           </p>
         </div>
       </div>
@@ -58,6 +58,9 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
   // --- Mouse Drag State ---
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // --- Hover State ---
+  const [hoveredName, setHoveredName] = useState<string | null>(null);
 
   // Filter out null/invalid data
   const chartData = data.filter(d =>
@@ -86,7 +89,14 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
           name: item.name,
           momentum: weighting === 'equal' ? item.momentumEqual : item.momentum,
           yValue: weighting === 'equal' ? (isRSI ? (item as any).rsiEqual : item.weekEqual) : (isRSI ? (item as any).rsi : item.week),
-          snapshotIndex
+          snapshotIndex,
+          // Extra payload data to prevent Tooltip crashing on historical points
+          week: weighting === 'equal' ? item.weekEqual : item.week,
+          rsi: weighting === 'equal' ? (item as any).rsiEqual : (item as any).rsi,
+          marketCap: item.marketCap,
+          stockCount: item.stockCount,
+          isHistorical: snapshotIndex < snapshotIds.length - 1,
+          dateLabel: snapshot.lastUpdated ? new Date(snapshot.lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
         };
 
         if (!trajectoryMap.has(item.name)) {
@@ -249,12 +259,25 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
     const latest = traj[traj.length - 1];
     const snapshotCount = Object.keys(multiSnapshotData || {}).length;
 
+    // Safety check just in case traj is empty
+    if (!traj.length) return null;
+
+    const name = traj[0].name;
+    const isHovered = hoveredName === name;
+    const isSomethingHovered = hoveredName !== null;
+
+    const baseColor = isHovered ? '#ef4444' : '#3D3DFF'; // Red if hovered, Blue otherwise
+
     return (
       <React.Fragment key={`traj-group-${index}`}>
         {/* Trail lines */}
         {traj.slice(0, -1).map((point, i) => {
           const nextPoint = traj[i + 1];
-          const opacity = (i + 1) / snapshotCount * 0.4;
+          // Base opacity scales up as we get closer to current
+          const baseOpacity = (i + 1) / snapshotCount * 0.4;
+          // If hovered, boost opacity. If something ELSE is hovered, drop opacity heavily.
+          const opacity = isHovered ? Math.max(0.6, baseOpacity * 2) : (isSomethingHovered ? baseOpacity * 0.15 : baseOpacity);
+
           return (
             <ReferenceLine
               key={`line-${index}-${i}`}
@@ -262,23 +285,31 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
                 { x: point.momentum, y: point.yValue },
                 { x: nextPoint.momentum, y: nextPoint.yValue }
               ]}
-              stroke="#3D3DFF"
-              strokeWidth={2}
+              stroke={baseColor}
+              strokeWidth={isHovered ? 3 : 2}
               strokeOpacity={opacity}
+              style={{ pointerEvents: 'none' }} // Prevent lines from trapping mouse events
             />
           );
         })}
         {/* Historical points as small dots */}
-        {traj.slice(0, -1).map((point, i) => (
-          <Scatter
-            key={`point-${index}-${i}`}
-            data={[point]}
-            fill="#3D3DFF"
-            fillOpacity={(i + 1) / snapshotCount * 0.3}
-          >
-            <Cell fill="#3D3DFF" radius={2} />
-          </Scatter>
-        ))}
+        {traj.slice(0, -1).map((point, i) => {
+          const baseOpacity = (i + 1) / snapshotCount * 0.3;
+          const opacity = isHovered ? Math.max(0.6, baseOpacity * 2) : (isSomethingHovered ? baseOpacity * 0.15 : baseOpacity);
+
+          return (
+            <Scatter
+              key={`point-${index}-${i}`}
+              data={[point]}
+              fill={baseColor}
+              fillOpacity={opacity}
+              onMouseEnter={() => setHoveredName(name)}
+              onMouseLeave={() => setHoveredName(prev => prev === name ? null : prev)}
+            >
+              <Cell fill={baseColor} radius={isHovered ? 6 : 4} />
+            </Scatter>
+          );
+        })}
       </React.Fragment>
     );
   };
@@ -349,7 +380,6 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart
             margin={{ top: 40, right: 60, bottom: 40, left: 40 }}
-            style={{ pointerEvents: zoomLevel > 1 ? 'none' : 'auto' }} // Disable recharts hover events while zoomed/panning so dragging works flawlessly
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
 
@@ -414,11 +444,27 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
             {trajectories.map((traj, i) => renderTrajectory(traj, i))}
 
             {/* Current Points */}
-            <Scatter name={groupBy} data={chartData} fill="#3D3DFF">
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill="#3D3DFF" />
-              ))}
-              <LabelList dataKey="name" position="right" style={{ fill: '#334155', fontSize: '10px', fontWeight: 600 }} />
+            <Scatter
+              name={groupBy}
+              data={chartData}
+              onMouseEnter={(e: any) => { if (e && e.name) setHoveredName(e.name); }}
+              onMouseLeave={(e: any) => { setHoveredName(prev => (e && prev === e.name) ? null : prev); }}
+            >
+              {chartData.map((entry, index) => {
+                const isHovered = hoveredName === entry.name;
+                const isSomethingHovered = hoveredName !== null;
+                const opacity = isHovered ? 1 : (isSomethingHovered ? 0.3 : 1);
+                const color = isHovered ? '#ef4444' : '#3D3DFF'; // Red if hovered, otherwise blue
+
+                return (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={color}
+                    fillOpacity={opacity}
+                  />
+                );
+              })}
+              <LabelList dataKey="name" position="right" style={{ fill: '#334155', fontSize: '10px', fontWeight: 600, pointerEvents: 'none' }} />
             </Scatter>
           </ScatterChart>
         </ResponsiveContainer>

@@ -26,7 +26,7 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
     const searchParams = useSearchParams();
 
     const currentSnapshot = searchParams.get('snapshot') || 'live';
-    const groupBy = searchParams.get('groupBy') || 'industry';
+    const groupBy = searchParams.get('groupBy') || 'sector';
     const currentSector = searchParams.get('sector') || 'all';
     const yAxis = searchParams.get('yAxis') || initialYAxis || 'week';
 
