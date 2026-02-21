@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 const envSchema = z.object({
     FINVIZ_API_URL: z.string().url().default('https://elite.finviz.com/export.ashx'),
-    FINVIZ_API_KEY: z.string().min(1, "FINVIZ_API_KEY is required"),
     GCP_PROJECT_ID: z.string().min(1, "GCP_PROJECT_ID is required"),
     GCP_BUCKET_NAME: z.string().optional(),
     GCP_CLIENT_EMAIL: z.string().email("GCP_CLIENT_EMAIL must be a valid email"),
@@ -18,7 +17,6 @@ const validateEnv = () => {
         return {
             finviz: {
                 apiUrl: parsed.FINVIZ_API_URL,
-                apiKey: parsed.FINVIZ_API_KEY,
             },
             gcp: {
                 projectId: parsed.GCP_PROJECT_ID,
@@ -36,7 +34,7 @@ const validateEnv = () => {
             if (isBuildPhase) {
                 console.warn('⚠️ Build Phase: Skipping strict environment variable validation.');
                 return {
-                    finviz: { apiUrl: '', apiKey: '' },
+                    finviz: { apiUrl: '' },
                     gcp: { projectId: 'dummy-project', clientEmail: '', privateKey: '' },
                     isProduction: true
                 };

@@ -1,21 +1,9 @@
 'use server';
 
-import axios from 'axios';
-import { parse } from 'csv-parse/sync';
 import { IndustryApiResponse, IndustryRow } from '@/types';
-import fs from 'fs';
-import path from 'path';
 import { revalidatePath, unstable_cache } from 'next/cache';
-import { uploadToGCS } from './gcs';
 import { config } from './config';
 import { queryBigQuery } from './bigquery';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 // Memory cache (optional/secondary now that we verify disk)
 let cachedData: IndustryApiResponse | null = null;
@@ -23,119 +11,6 @@ let cachedData: IndustryApiResponse | null = null;
 export async function refreshMarketData() {
     console.log('Force refreshing market data...');
     revalidatePath('/');
-}
-
-function parseMarketCap(cap: string): number {
-    if (!cap) return 0;
-    const value = parseFloat(cap.replace(/[^0-9.]/g, ''));
-    if (cap.endsWith('B')) return value * 1_000_000_000;
-    if (cap.endsWith('M')) return value * 1_000_000;
-    if (cap.endsWith('K')) return value * 1_000;
-    return value;
-}
-
-function parsePercent(perf: string): number {
-    if (!perf || perf === '-') return 0;
-    return parseFloat(perf.replace('%', ''));
-}
-
-function getDateString(timestamp: number): string {
-    return new Date(timestamp).toISOString().split('T')[0];
-}
-
-async function fetchCsv<T>(viewId: string): Promise<T[]> {
-    const { apiUrl, apiKey } = config.finviz;
-
-    if (!apiKey) {
-        throw new Error('FINVIZ_API_KEY is not defined');
-    }
-
-    const url = `${apiUrl}?v=${viewId}&f=cap_midover&auth=${apiKey}`;
-    console.log(`Fetching Finviz view ${viewId}...`);
-    const response = await axios.get(url, { responseType: 'text' });
-    return parse(response.data, {
-        columns: true,
-        skip_empty_lines: true,
-        relax_column_count: true,
-    }) as T[];
-}
-
-/**
- * Merges multiple views into a single CSV and saves it.
- */
-async function exportFullTicker_Data(
-    timestamp: number,
-    overview: Record<string, any>[],
-    valuation: Record<string, any>[],
-    financial: Record<string, any>[],
-    performance: Record<string, any>[],
-    technical: Record<string, any>[],
-    custom: Record<string, any>[]
-) {
-    console.log('Merging all views for full CSV export...');
-    const fullData = new Map<string, any>();
-
-    const allViews = [overview, valuation, financial, performance, technical, custom];
-
-    allViews.forEach(viewRows => {
-        viewRows.forEach(row => {
-            const ticker = row.Ticker;
-            if (!ticker) return;
-
-            if (!fullData.has(ticker)) {
-                fullData.set(ticker, { ...row });
-            } else {
-                const existing = fullData.get(ticker);
-                fullData.set(ticker, { ...existing, ...row });
-            }
-        });
-    });
-
-    const mergedRows = Array.from(fullData.values());
-    if (mergedRows.length === 0) return;
-
-    // Generate CSV
-    const allHeaders = new Set<string>();
-    mergedRows.forEach(row => Object.keys(row).forEach(h => allHeaders.add(h)));
-    const headers = Array.from(allHeaders);
-
-    const csvContent = [
-        headers.map(h => `"${h}"`).join(','),
-        ...mergedRows.map(row =>
-            headers.map(header => {
-                const val = row[header] ?? '';
-                const stringVal = String(val).replace(/"/g, '""');
-                return `"${stringVal}"`;
-            }).join(',')
-        )
-    ].join('\n');
-
-    const dateStr = getDateString(timestamp);
-    const filename = `full_export_${dateStr}.csv`;
-
-    // Save locally
-    const filePath = path.join(DATA_DIR, filename);
-    fs.writeFileSync(filePath, csvContent);
-
-    // Upload to GCS
-    await uploadToGCS(filename, csvContent, 'text/csv');
-
-    console.log(`Saved full export: ${filename} (${mergedRows.length} tickers)`);
-}
-
-async function saveSnapshot(data: IndustryApiResponse) {
-    const dateStr = getDateString(data.lastUpdated);
-    const filename = `snapshot_${dateStr}.json`;
-    const content = JSON.stringify(data, null, 2);
-
-    // Save locally
-    const filePath = path.join(DATA_DIR, filename);
-    fs.writeFileSync(filePath, content);
-
-    // Upload to GCS
-    await uploadToGCS(filename, content, 'application/json');
-
-    console.log(`Saved snapshot: ${filename}`);
 }
 
 export const getAvailableSnapshots = unstable_cache(async () => {
