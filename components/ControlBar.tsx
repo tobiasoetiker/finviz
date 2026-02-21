@@ -7,8 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 interface Props {
     weighting: 'weighted' | 'equal';
     setWeighting: (w: 'weighted' | 'equal') => void;
-    momentumFocus: 'all' | 'top10_momentum' | 'top10_weak';
-    setMomentumFocus: (s: 'all' | 'top10_momentum' | 'top10_weak') => void;
+    momentumFocus: 'all' | 'top10_momentum' | 'top10_performance';
+    setMomentumFocus: (s: 'all' | 'top10_momentum' | 'top10_performance') => void;
     currentSnapshot: string;
     groupBy: string;
     currentSector: string;
@@ -168,7 +168,7 @@ export default function ControlBar({
                                 options={[
                                     { value: 'all', label: 'Show All', icon: <LineChart size={14} /> },
                                     { value: 'top10_momentum', label: 'Top 10 Momentum', icon: <Scale size={14} /> },
-                                    { value: 'top10_weak', label: 'Weakest 10', icon: <Briefcase size={14} /> }
+                                    { value: 'top10_performance', label: 'Top 10 Performance', icon: <Briefcase size={14} /> }
                                 ]}
                             />
                         </ControlGroup>

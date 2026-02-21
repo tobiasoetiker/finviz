@@ -20,7 +20,7 @@ interface Props {
 
 export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
-    const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_weak'>('all');
+    const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
     const [isRefreshing, startRefresh] = useTransition();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -58,9 +58,9 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
 
     if (momentumFocus === 'top10_momentum') {
         displayData = [...displayData].sort((a, b) => b.momentum - a.momentum).slice(0, 10);
-    } else if (momentumFocus === 'top10_weak') {
-        // Weak performance = lowest weekly return
-        displayData = [...displayData].sort((a, b) => a.week - b.week).slice(0, 10);
+    } else if (momentumFocus === 'top10_performance') {
+        // Top performance = highest weekly return
+        displayData = [...displayData].sort((a, b) => b.week - a.week).slice(0, 10);
     }
 
     return (

@@ -106,8 +106,10 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
       });
     });
 
-    return Array.from(trajectoryMap.values()).filter(t => t.length > 1);
-  }, [multiSnapshotData, weighting, isRSI]);
+    const activeNames = new Set(chartData.map(d => d.name));
+    return Array.from(trajectoryMap.values())
+      .filter(t => t.length > 1 && activeNames.has(t[0].name));
+  }, [multiSnapshotData, weighting, isRSI, chartData]);
 
   // Calculate dynamic domain
   const allMomentumValues = chartData.map(d => Math.abs(d.momentum));
