@@ -277,7 +277,7 @@ export default function ControlBar({
                             </ControlGroup>
                         )}
 
-                        {groupBy === 'ticker' && (
+                        {(groupBy === 'industry' || groupBy === 'ticker') && (
                             <ControlGroup label="Filter Industry">
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
