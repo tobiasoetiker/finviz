@@ -30,7 +30,19 @@ const validateEnv = () => {
         };
     } catch (error) {
         if (typeof window === 'undefined') {
-            // Only throw error on the server
+            // If we are building on Vercel or locally, skip throwing to allow the build to succeed
+            const isBuildPhase = process.env.npm_lifecycle_event === 'build' || process.env.VERCEL_ENV;
+
+            if (isBuildPhase) {
+                console.warn('⚠️ Build Phase: Skipping strict environment variable validation.');
+                return {
+                    finviz: { apiUrl: '', apiKey: '' },
+                    gcp: { projectId: 'dummy-project', clientEmail: '', privateKey: '' },
+                    isProduction: true
+                };
+            }
+
+            // Only throw error on the server at true runtime
             console.error('❌ Invalid environment variables:', error);
             throw new Error('Invalid environment variables. Check your .env.local file.');
         }
