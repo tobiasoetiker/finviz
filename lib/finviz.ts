@@ -92,7 +92,7 @@ export const getAvailableIndustries = unstable_cache(async (snapshotId?: string,
     }
 }, ['available-industries'], { tags: ['finviz-data'], revalidate: 3600 });
 
-export const getIndustryPerformance = unstable_cache(async (
+export const getIndustryPerformance = async (
     snapshotId?: string,
     forceFetch = false,
     groupBy: 'industry' | 'sector' | 'ticker' = 'industry',
@@ -160,6 +160,13 @@ export const getIndustryPerformance = unstable_cache(async (
 
         const results = await queryBigQuery(query, Object.keys(params).length > 0 ? params : undefined) as (IndustryRow & { processed_at: string | { value: string } })[];
 
+        console.log("DEBUG QUERY EXECUTION:", {
+            groupBy,
+            tableName: groupBy === 'industry' ? 'industry_history' : 'sector_history',
+            params,
+            resultsLength: results.length
+        });
+
         // Use the actual processed_at from the data if available, otherwise fallback
         const firstRow = results.length > 0 ? results[0] : null;
         let dataTimestamp = Date.now();
@@ -170,7 +177,7 @@ export const getIndustryPerformance = unstable_cache(async (
         }
 
         // Clean data for client serialization
-        const cleanResults = results.map((row) => {
+        const cleanResults = results.map((row: any) => {
             const timestampVal = typeof row.processed_at === 'string' ? row.processed_at : row.processed_at?.value;
             let processedAtTs = null;
             if (timestampVal) {
@@ -179,7 +186,21 @@ export const getIndustryPerformance = unstable_cache(async (
 
             return {
                 ...row,
-                processed_at: processedAtTs
+                name: row.name || (groupBy === 'industry' ? row.industry : row.sector),
+                processed_at: processedAtTs,
+                // Explicitly map properties that might be returned lowercase by BigQuery
+                weekEqual: row.weekEqual ?? row.weekequal,
+                monthEqual: row.monthEqual ?? row.monthequal,
+                rsiEqual: row.rsiEqual ?? row.rsiequal,
+                momentumEqual: row.momentumEqual ?? row.momentumequal,
+                marketCap: row.marketCap ?? row.marketcap,
+                stockCount: row.stockCount ?? row.stockcount,
+                topStocks: row.topStocks ?? row.topstocks,
+                // Fallbacks for primary metrics to avoid NaN filtering errors if somehow missing
+                momentum: row.momentum ?? 0,
+                week: row.week ?? 0,
+                month: row.month ?? 0,
+                rsi: row.rsi ?? 0
             };
         });
 
@@ -190,6 +211,6 @@ export const getIndustryPerformance = unstable_cache(async (
 
     } catch (error) {
         console.error('Error fetching data from BigQuery:', error);
-        return { data: [], lastUpdated: 0 };
+        throw error;
     }
-}, ['industry-performance'], { tags: ['finviz-data'], revalidate: 3600 });
+};

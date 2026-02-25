@@ -70,6 +70,13 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
     !isNaN(d[yAxis] as number)
   );
 
+  console.log("MOMENTUM MATRIX DATA:", {
+    totalInData: data.length,
+    totalInChartData: chartData.length,
+    firstRaw: data[0],
+    firstChart: chartData[0]
+  });
+
   const isRSI = yAxis === 'rsi';
 
   // Process multi-snapshot data into trajectories

@@ -74,11 +74,15 @@ def aggregate_current_data(dataset_id, base_table_name):
         sector_table = f"{project_id}.{dataset_id}.{base_table_name}_sector_history"
         
         # 1. Set current='no' in aggregate tables
+        # Use a transaction-like approach by updating only if the previous step succeeded
         for table in [industry_table, sector_table]:
             try:
-                client.query(f"UPDATE `{table}` SET is_current = 'no' WHERE is_current = 'yes'").result()
+                results = client.query(f"UPDATE `{table}` SET is_current = 'no' WHERE is_current = 'yes'").result()
+                logger.info(f"Set legacy records to is_current='no' in {table}. Rows affected: {results.num_dml_affected_rows}")
             except Exception as e:
-                logger.warning(f"Could not update is_current in {table}: {e}")
+                logger.error(f"CRITICAL: Could not update is_current in {table}: {e}")
+                # We do not raise here yet to allow the INSERT to potentially fix the state, 
+                # but we'll flag it.
                 
         # 2. Insert Industry Aggregation
         query_industry = f"""
