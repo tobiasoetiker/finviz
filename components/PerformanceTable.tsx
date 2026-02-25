@@ -11,7 +11,7 @@ interface Props {
     groupBy?: string;
 }
 
-type SortKey = 'name' | 'week' | 'month' | 'momentum' | 'marketCap';
+type SortKey = 'name' | 'change' | 'week' | 'month' | 'momentum' | 'marketCap';
 
 export default function PerformanceTable({ data, title = 'Industry Performance', groupBy = 'industry' }: Props) {
     const [sortKey, setSortKey] = useState<SortKey>('momentum');
@@ -90,6 +90,9 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors w-32" onClick={() => handleSort('marketCap')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Market Cap</span> <SortIcon column="marketCap" /></div>
                             </th>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('change')}>
+                                <div className="flex items-center justify-end space-x-1"><span>Daily</span> <SortIcon column="change" /></div>
+                            </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('week')}>
                                 <div className="flex items-center justify-end space-x-1"><span>1 Week</span> <SortIcon column="week" /></div>
                             </th>
@@ -128,6 +131,9 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                                         style={{ width: `${Math.max((item.marketCap / maxMarketCap) * 100, 1)}%`, zIndex: 0 }}
                                     />
                                     <span className="relative z-10 font-bold text-slate-700">{formatMoney(item.marketCap)}</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <span className={getBadgeClass(item.change)}>{formatPercent(item.change)}</span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <span className={getBadgeClass(item.week)}>{formatPercent(item.week)}</span>

@@ -122,6 +122,7 @@ export const getIndustryPerformance = async (
                     industry, sector, ticker, processed_at,
                     SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
                     SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                    SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
                     SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
                     SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
                 FROM latest_data
@@ -131,13 +132,13 @@ export const getIndustryPerformance = async (
             )
             SELECT 
                 ticker as name, sector, industry,
-                pct_week as week, pct_month as month, rsi,
+                pct_change as change, pct_week as week, pct_month as month, rsi,
                 pct_week - (pct_month / 4) as momentum,
-                pct_week as weekEqual, pct_month as monthEqual, rsi as rsiEqual,
+                pct_change as changeEqual, pct_week as weekEqual, pct_month as monthEqual, rsi as rsiEqual,
                 pct_week - (pct_month / 4) as momentumEqual,
                 SUM(mcap) as marketCap, 1 as stockCount, processed_at, CAST(NULL AS ARRAY<STRUCT<ticker STRING, week FLOAT64>>) as topStocks
             FROM clean_data
-            GROUP BY name, sector, industry, week, month, rsi, momentum, weekEqual, monthEqual, rsiEqual, momentumEqual, processed_at
+            GROUP BY name, sector, industry, change, week, month, rsi, momentum, changeEqual, weekEqual, monthEqual, rsiEqual, momentumEqual, processed_at
             ORDER BY momentum DESC
             `;
         } else {
@@ -189,6 +190,7 @@ export const getIndustryPerformance = async (
                 name: row.name || (groupBy === 'industry' ? row.industry : row.sector),
                 processed_at: processedAtTs,
                 // Explicitly map properties that might be returned lowercase by BigQuery
+                changeEqual: row.changeEqual ?? row.changeequal,
                 weekEqual: row.weekEqual ?? row.weekequal,
                 monthEqual: row.monthEqual ?? row.monthequal,
                 rsiEqual: row.rsiEqual ?? row.rsiequal,
@@ -198,6 +200,7 @@ export const getIndustryPerformance = async (
                 topStocks: row.topStocks ?? row.topstocks,
                 // Fallbacks for primary metrics to avoid NaN filtering errors if somehow missing
                 momentum: row.momentum ?? 0,
+                change: row.change ?? 0,
                 week: row.week ?? 0,
                 month: row.month ?? 0,
                 rsi: row.rsi ?? 0

@@ -1,6 +1,6 @@
 export interface GroupPerformance {
   name: string;
-  change: number; // Daily change (optional)
+  change: number; // Daily change
 
   // Market-Cap Weighted
   week: number;

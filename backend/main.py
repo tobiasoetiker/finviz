@@ -92,6 +92,7 @@ def aggregate_current_data(dataset_id, base_table_name):
                 industry, sector, processed_at, is_current, ticker,
                 SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
                 SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
                 SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
                 SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
             FROM `{raw_table}`
@@ -100,11 +101,12 @@ def aggregate_current_data(dataset_id, base_table_name):
         SELECT 
             CAST(processed_at AS STRING) as snapshot_id, MAX(processed_at) as processed_at, 'yes' as is_current,
             industry as name, ANY_VALUE(sector) as parent_sector,
+            SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
             SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
             SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
             SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
             (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
-            AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
+            AVG(pct_change) as changeEqual, AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
             SUM(mcap) as marketCap, COUNT(*) as stockCount,
             ARRAY_AGG(STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5) as topStocks
         FROM raw_data WHERE industry IS NOT NULL GROUP BY CAST(processed_at AS STRING), industry
@@ -120,6 +122,7 @@ def aggregate_current_data(dataset_id, base_table_name):
                 sector, processed_at, is_current, ticker,
                 SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
                 SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
                 SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
                 SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
             FROM `{raw_table}`
@@ -128,11 +131,12 @@ def aggregate_current_data(dataset_id, base_table_name):
         SELECT 
             CAST(processed_at AS STRING) as snapshot_id, MAX(processed_at) as processed_at, 'yes' as is_current,
             sector as name, CAST(NULL as STRING) as parent_sector,
+            SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
             SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
             SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
             SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
             (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
-            AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
+            AVG(pct_change) as changeEqual, AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
             SUM(mcap) as marketCap, COUNT(*) as stockCount,
             ARRAY_AGG(STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5) as topStocks
         FROM raw_data WHERE sector IS NOT NULL GROUP BY CAST(processed_at AS STRING), sector
@@ -144,7 +148,7 @@ def aggregate_current_data(dataset_id, base_table_name):
         logger.error(f"Failed to aggregate current data: {e}")
         raise
 
-def fetch_view(view_name, view_id, filter_param, api_url, api_key):
+def normalize_columns(df):
     """Renames columns to be BigQuery friendly."""
     import re
     # Lowercase, replace special chars with _, strip leading/trailing underscores
