@@ -47,6 +47,7 @@ def backfill():
             is_current,
             SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
             SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+            SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
             SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
             SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap,
             ticker
@@ -59,11 +60,13 @@ def backfill():
         industry as name,
         ANY_VALUE(sector) as parent_sector,
         -- Market-Cap Weighted
+        SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
         SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
         SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
         SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
         (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
         -- Equal Weighted
+        AVG(pct_change) as changeEqual,
         AVG(pct_week) as weekEqual,
         AVG(pct_month) as monthEqual,
         AVG(rsi) as rsiEqual,
@@ -95,6 +98,7 @@ def backfill():
             is_current,
             SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
             SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+            SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
             SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
             SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap,
             ticker
@@ -107,11 +111,13 @@ def backfill():
         sector as name,
         CAST(NULL as STRING) as parent_sector,
         -- Market-Cap Weighted
+        SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
         SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
         SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
         SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
         (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
         -- Equal Weighted
+        AVG(pct_change) as changeEqual,
         AVG(pct_week) as weekEqual,
         AVG(pct_month) as monthEqual,
         AVG(rsi) as rsiEqual,

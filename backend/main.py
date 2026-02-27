@@ -86,7 +86,12 @@ def aggregate_current_data(dataset_id, base_table_name):
                 
         # 2. Insert Industry Aggregation
         query_industry = f"""
-        INSERT INTO `{industry_table}`
+        INSERT INTO `{industry_table}` (
+            snapshot_id, processed_at, is_current, name, parent_sector,
+            change, week, month, rsi, momentum,
+            changeEqual, weekEqual, monthEqual, rsiEqual, momentumEqual,
+            marketCap, stockCount, topStocks
+        )
         WITH raw_data AS (
             SELECT 
                 industry, sector, processed_at, is_current, ticker,
@@ -116,7 +121,12 @@ def aggregate_current_data(dataset_id, base_table_name):
         
         # 3. Insert Sector Aggregation
         query_sector = f"""
-        INSERT INTO `{sector_table}`
+        INSERT INTO `{sector_table}` (
+            snapshot_id, processed_at, is_current, name, parent_sector,
+            change, week, month, rsi, momentum,
+            changeEqual, weekEqual, monthEqual, rsiEqual, momentumEqual,
+            marketCap, stockCount, topStocks
+        )
         WITH raw_data AS (
             SELECT 
                 sector, processed_at, is_current, ticker,
