@@ -73,3 +73,19 @@ export interface IndustryApiResponse {
 
 export type SectorData = GroupPerformance[];
 export type IndustryData = GroupPerformance[];
+
+export interface BollingerSignalRow {
+  ticker: string;
+  company: string;
+  sector: string;
+  industry: string;
+  price: number;
+  rsi: number;
+  sma20: number;
+  stddev20: number;
+  lowerBand: number;
+  upperBand: number;
+  distanceFromBand: number;
+  bandSide: 'lower' | 'upper';
+  processedAt: number;
+}

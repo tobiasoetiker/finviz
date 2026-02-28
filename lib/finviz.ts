@@ -1,6 +1,6 @@
 'use server';
 
-import { IndustryApiResponse, IndustryRow } from '@/types';
+import { IndustryApiResponse, IndustryRow, BollingerSignalRow } from '@/types';
 import { revalidatePath, unstable_cache } from 'next/cache';
 import { config } from './config';
 import { queryBigQuery } from './bigquery';
@@ -215,5 +215,95 @@ export const getIndustryPerformance = async (
     } catch (error) {
         console.error('Error fetching data from BigQuery:', error);
         throw error;
+    }
+};
+
+export const getBollingerOversoldStocks = async (snapshotId?: string): Promise<BollingerSignalRow[]> => {
+    try {
+        console.log(`Fetching Bollinger signals from BigQuery... snapshotId: ${snapshotId || 'live'}`);
+
+        const params: Record<string, string> = {};
+        if (snapshotId && snapshotId !== 'live') params.snapshotId = snapshotId;
+
+        const query = `
+        WITH HistoricalPrices AS (
+            SELECT 
+                ticker, company, sector, industry, processed_at, is_current, relative_strength_index_14 as rsi,
+                SAFE_CAST(price AS FLOAT64) as price_val
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+            WHERE ticker IS NOT NULL AND price IS NOT NULL
+        ),
+        CalculatedBands AS (
+            SELECT 
+                *,
+                AVG(price_val) OVER (
+                    PARTITION BY ticker 
+                    ORDER BY processed_at 
+                    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+                ) as sma20,
+                STDDEV_SAMP(price_val) OVER (
+                    PARTITION BY ticker 
+                    ORDER BY processed_at 
+                    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+                ) as stddev20
+            FROM HistoricalPrices
+        ),
+        Signals AS (
+            SELECT 
+                ticker, company, sector, industry, price_val as price, rsi,
+                sma20, stddev20, 
+                (sma20 - 2 * stddev20) as lowerBand,
+                (sma20 + 2 * stddev20) as upperBand,
+                processed_at,
+                is_current
+            FROM CalculatedBands
+            WHERE stddev20 IS NOT NULL
+        ),
+        FilteredSignals AS (
+            SELECT * FROM Signals
+            WHERE ${snapshotId && snapshotId !== 'live' ? 'CAST(processed_at AS STRING) = @snapshotId' : "is_current = 'yes'"}
+              AND rsi < 30
+              AND (price < lowerBand OR price > upperBand)
+        )
+        SELECT 
+            *,
+            CASE WHEN price < lowerBand THEN 'lower' ELSE 'upper' END as bandSide,
+            CASE 
+                WHEN price < lowerBand THEN ((lowerBand - price) / lowerBand) * 100
+                ELSE ((price - upperBand) / upperBand) * 100
+            END as distanceFromBand
+        FROM FilteredSignals
+        ORDER BY distanceFromBand DESC
+        `;
+
+        const results = await queryBigQuery(query, Object.keys(params).length > 0 ? params : undefined) as any[];
+
+        return results.map(row => {
+            const timestampVal = typeof row.processed_at === 'string' ? row.processed_at : row.processed_at?.value;
+            let processedAtTs = 0;
+            if (timestampVal) {
+                processedAtTs = new Date(timestampVal).getTime();
+            }
+
+            return {
+                ticker: row.ticker,
+                company: row.company || row.ticker,
+                sector: row.sector || 'Unknown',
+                industry: row.industry || 'Unknown',
+                price: row.price || 0,
+                rsi: row.rsi || 0,
+                sma20: row.sma20 || 0,
+                stddev20: row.stddev20 || 0,
+                lowerBand: row.lowerBand || 0,
+                upperBand: row.upperBand || 0,
+                distanceFromBand: row.distanceFromBand || 0,
+                bandSide: row.bandSide as 'lower' | 'upper',
+                processedAt: processedAtTs
+            };
+        });
+
+    } catch (error) {
+        console.error('Error fetching Bollinger signals:', error);
+        return [];
     }
 };

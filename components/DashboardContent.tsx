@@ -8,6 +8,8 @@ import PerformanceTable from './PerformanceTable';
 import MomentumMatrix from './MomentumMatrix';
 import MarketMonitor from './MarketMonitor';
 import ControlBar from './ControlBar';
+import BollingerSignals from './BollingerSignals';
+import { BollingerSignalRow } from '@/types';
 
 interface Props {
     data: IndustryApiResponse;
@@ -16,9 +18,10 @@ interface Props {
     sectors?: string[];
     industries?: string[];
     yAxis?: string;
+    bollingerSignals?: BollingerSignalRow[];
 }
 
-export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis }: Props) {
+export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [] }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
     const [rsiRange, setRsiRange] = useState<[number, number]>([0, 100]);
@@ -112,6 +115,18 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                     title={groupBy === 'ticker' ? 'Stock Performance' : (groupBy === 'sector' ? 'Sector Performance' : 'Industry Performance')}
                     groupBy={groupBy as string}
                 />
+            </div>
+
+            {/* Bollinger Signals Standalone Section */}
+            <div className="pt-24 border-t border-slate-100 mt-24">
+                <div className="mb-10">
+                    <h2 className="text-4xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                        Oversold Extremes
+                        <span className="px-3 py-1 bg-rose-100 text-rose-700 text-sm font-bold rounded-full tracking-widest uppercase align-middle mt-1">Signals</span>
+                    </h2>
+                    <p className="text-slate-500 mt-3 text-lg">Stocks with RSI &lt; 30 and price outside the 20-period 2-SD Bollinger Bands.</p>
+                </div>
+                <BollingerSignals data={bollingerSignals} />
             </div>
 
             {/* Decorative element moved inside the container for better positioning */}

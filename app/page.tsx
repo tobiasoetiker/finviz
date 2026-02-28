@@ -1,5 +1,5 @@
 import DashboardContent from '@/components/DashboardContent';
-import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, getAvailableIndustries } from '@/lib/finviz';
+import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, getAvailableIndustries, getBollingerOversoldStocks } from '@/lib/finviz';
 import { IndustryApiResponse } from '@/types';
 
 interface PageProps {
@@ -18,9 +18,10 @@ export default async function Home({ searchParams }: PageProps) {
   const snapshotIds = snapshot ? snapshot.split(',') : [defaultSnapshotId];
 
   // Fetch data for all snapshots in parallel
-  const [sectors, industries, ...multiData] = await Promise.all([
+  const [sectors, industries, bollingerSignals, ...multiData] = await Promise.all([
     getAvailableSectors(snapshotIds[0]),
     getAvailableIndustries(snapshotIds[0], sector),
+    getBollingerOversoldStocks(snapshotIds[0]),
     ...snapshotIds.map(id => getIndustryPerformance(id === 'live' ? undefined : id, false, groupByParam, sector, industry))
   ]);
 
@@ -39,6 +40,7 @@ export default async function Home({ searchParams }: PageProps) {
         sectors={sectors}
         industries={industries}
         yAxis={yAxis}
+        bollingerSignals={bollingerSignals}
       />
     </main>
   );
