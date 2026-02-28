@@ -64,25 +64,65 @@ def set_all_historical(dataset_id, table_id):
         # If the table doesn't exist yet, we might get an error. Just log and continue.
         logger.warning(f"Could not update is_current in {table_id} (might be new): {e}")
 
+def _rebuild_aggregation_tables(client, project_id, raw_table, industry_table, sector_table):
+    """Full rebuild of industry and sector tables from all historical data. Used as a fallback."""
+    logger.warning("FALLBACK: Rebuilding aggregation tables from scratch...")
+    
+    raw_cte = f"""
+        WITH raw_data AS (
+            SELECT 
+                industry, sector, processed_at, is_current, ticker,
+                SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
+                SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
+                SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
+                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
+            FROM `{raw_table}`
+        )
+    """
+    
+    agg_select = """
+        SELECT 
+            CAST(processed_at AS STRING) as snapshot_id, MAX(processed_at) as processed_at, is_current,
+            {group_col} as name, {parent_sector},
+            SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
+            SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
+            SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
+            SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
+            (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
+            AVG(pct_change) as changeEqual, AVG(pct_week) as weekEqual, AVG(pct_month) as monthEqual, AVG(rsi) as rsiEqual, AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
+            SUM(mcap) as marketCap, COUNT(*) as stockCount,
+            ARRAY_AGG(STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5) as topStocks
+        FROM raw_data
+        WHERE {group_col} IS NOT NULL
+        GROUP BY CAST(processed_at AS STRING), is_current, {group_col}
+    """
+    
+    # Rebuild industry table
+    query_industry = f"CREATE OR REPLACE TABLE `{industry_table}` AS {raw_cte} {agg_select.format(group_col='industry', parent_sector='ANY_VALUE(sector) as parent_sector')}"
+    client.query(query_industry).result()
+    logger.info(f"FALLBACK: Rebuilt {industry_table} from scratch.")
+    
+    # Rebuild sector table  
+    query_sector = f"CREATE OR REPLACE TABLE `{sector_table}` AS {raw_cte} {agg_select.format(group_col='sector', parent_sector='CAST(NULL as STRING) as parent_sector')}"
+    client.query(query_sector).result()
+    logger.info(f"FALLBACK: Rebuilt {sector_table} from scratch.")
+
+
 def aggregate_current_data(dataset_id, base_table_name):
-    """Aggregates the current snapshot and appends to the industry and sector history tables."""
+    """Aggregates the current snapshot and appends to the industry and sector history tables.
+    Falls back to a full rebuild if the incremental approach fails."""
+    client = bigquery.Client()
+    project_id = client.project
+    raw_table = f"{project_id}.{dataset_id}.{base_table_name}_history"
+    industry_table = f"{project_id}.{dataset_id}.{base_table_name}_industry_history"
+    sector_table = f"{project_id}.{dataset_id}.{base_table_name}_sector_history"
+    
     try:
-        client = bigquery.Client()
-        project_id = client.project
-        raw_table = f"{project_id}.{dataset_id}.{base_table_name}_history"
-        industry_table = f"{project_id}.{dataset_id}.{base_table_name}_industry_history"
-        sector_table = f"{project_id}.{dataset_id}.{base_table_name}_sector_history"
-        
         # 1. Set current='no' in aggregate tables
-        # Use a transaction-like approach by updating only if the previous step succeeded
         for table in [industry_table, sector_table]:
-            try:
-                results = client.query(f"UPDATE `{table}` SET is_current = 'no' WHERE is_current = 'yes'").result()
-                logger.info(f"Set legacy records to is_current='no' in {table}. Rows affected: {results.num_dml_affected_rows}")
-            except Exception as e:
-                logger.error(f"CRITICAL: Could not update is_current in {table}: {e}")
-                # We do not raise here yet to allow the INSERT to potentially fix the state, 
-                # but we'll flag it.
+            results = client.query(f"UPDATE `{table}` SET is_current = 'no' WHERE is_current = 'yes'").result()
+            logger.info(f"Set legacy records to is_current='no' in {table}. Rows affected: {results.num_dml_affected_rows}")
                 
         # 2. Insert Industry Aggregation
         query_industry = f"""
@@ -154,9 +194,22 @@ def aggregate_current_data(dataset_id, base_table_name):
         client.query(query_sector).result()
         logger.info(f"Appended current sector aggregation to {sector_table}.")
         
+        # 4. Verify that current data exists in the aggregation tables
+        for table_name, table_ref in [("industry", industry_table), ("sector", sector_table)]:
+            check = client.query(f"SELECT COUNT(*) as cnt FROM `{table_ref}` WHERE is_current = 'yes'").result()
+            count = list(check)[0].cnt
+            if count == 0:
+                raise RuntimeError(f"Verification failed: {table_name} table has 0 rows with is_current='yes' after INSERT.")
+            logger.info(f"Verified {table_name} aggregation: {count} current rows.")
+        
     except Exception as e:
-        logger.error(f"Failed to aggregate current data: {e}")
-        raise
+        logger.error(f"Incremental aggregation failed: {e}. Falling back to full rebuild...")
+        try:
+            _rebuild_aggregation_tables(client, project_id, raw_table, industry_table, sector_table)
+            logger.info("Full rebuild fallback completed successfully.")
+        except Exception as rebuild_err:
+            logger.error(f"CRITICAL: Full rebuild also failed: {rebuild_err}")
+            raise
 
 def normalize_columns(df):
     """Renames columns to be BigQuery friendly."""
