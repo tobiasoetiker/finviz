@@ -2,6 +2,8 @@ finvizfinance
 pandas
 google-cloud-storage
 google-cloud-bigquery
+pandas-gbq
+db-dtypes
 functions-framework
 pyarrow
 requests
