@@ -81,6 +81,7 @@ export interface BollingerSignalRow {
   industry: string;
   price: number;
   rsi: number;
+  marketCap: number;
   sma20: number;
   stddev20: number;
   lowerBand: number;

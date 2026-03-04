@@ -230,7 +230,8 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
         WITH HistoricalPrices AS (
             SELECT 
                 ticker, company, sector, industry, processed_at, is_current, relative_strength_index_14 as rsi,
-                SAFE_CAST(price AS FLOAT64) as price_val
+                SAFE_CAST(price AS FLOAT64) as price_val,
+                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as market_cap_val
             FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
             WHERE ticker IS NOT NULL AND price IS NOT NULL
         ),
@@ -251,7 +252,7 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
         ),
         Signals AS (
             SELECT 
-                ticker, company, sector, industry, price_val as price, rsi,
+                ticker, company, sector, industry, price_val as price, rsi, market_cap_val as marketCap,
                 sma20, stddev20, 
                 (sma20 - 2 * stddev20) as lowerBand,
                 (sma20 + 2 * stddev20) as upperBand,
@@ -293,6 +294,7 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
                 industry: row.industry || 'Unknown',
                 price: row.price || 0,
                 rsi: row.rsi || 0,
+                marketCap: row.marketCap || 0,
                 sma20: row.sma20 || 0,
                 stddev20: row.stddev20 || 0,
                 lowerBand: row.lowerBand || 0,

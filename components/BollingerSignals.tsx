@@ -1,5 +1,12 @@
 import { BollingerSignalRow } from '@/types';
 
+const formatMarketCap = (value: number) => {
+    if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+    if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+    return value.toLocaleString();
+};
+
 export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: BollingerSignalRow[]; rsiThreshold?: number }) {
     if (!data || data.length === 0) {
         return (
@@ -19,7 +26,7 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
                         <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap hidden sm:table-cell">Sector</th>
                         <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right">Price</th>
                         <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right">RSI</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap hidden md:table-cell">Bands (L-U)</th>
+                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right hidden md:table-cell">Market Cap</th>
                         <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right">Distance</th>
                     </tr>
                 </thead>
@@ -50,8 +57,8 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
                                     {row.rsi.toFixed(2)}
                                 </span>
                             </td>
-                            <td className="py-3 px-4 text-[10px] tabular-nums text-slate-500 font-medium hidden md:table-cell">
-                                <span className="text-slate-400">$</span>{row.lowerBand.toFixed(2)} <span className="text-slate-300 mx-1">-</span> <span className="text-slate-400">$</span>{row.upperBand.toFixed(2)}
+                            <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 font-medium hidden md:table-cell">
+                                {formatMarketCap(row.marketCap)}
                             </td>
                             <td className="py-3 px-4 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
