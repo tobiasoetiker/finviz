@@ -1,10 +1,10 @@
 import { BollingerSignalRow } from '@/types';
 
-export default function BollingerSignals({ data }: { data: BollingerSignalRow[] }) {
+export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: BollingerSignalRow[]; rsiThreshold?: number }) {
     if (!data || data.length === 0) {
         return (
             <div className="py-10 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                <p>No stocks currently meet the RSI &lt; 30 and Bollinger Band criteria.</p>
+                <p>No stocks currently meet the RSI &lt; {rsiThreshold} and Bollinger Band criteria.</p>
             </div>
         );
     }

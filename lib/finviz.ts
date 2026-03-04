@@ -218,12 +218,13 @@ export const getIndustryPerformance = async (
     }
 };
 
-export const getBollingerOversoldStocks = async (snapshotId?: string): Promise<BollingerSignalRow[]> => {
+export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThreshold: number = 30): Promise<BollingerSignalRow[]> => {
     try {
         console.log(`Fetching Bollinger signals from BigQuery... snapshotId: ${snapshotId || 'live'}`);
 
-        const params: Record<string, string> = {};
+        const params: Record<string, string | number> = {};
         if (snapshotId && snapshotId !== 'live') params.snapshotId = snapshotId;
+        params.rsiThreshold = rsiThreshold;
 
         const query = `
         WITH HistoricalPrices AS (
@@ -262,7 +263,7 @@ export const getBollingerOversoldStocks = async (snapshotId?: string): Promise<B
         FilteredSignals AS (
             SELECT * FROM Signals
             WHERE ${snapshotId && snapshotId !== 'live' ? 'CAST(processed_at AS STRING) = @snapshotId' : "is_current = 'yes'"}
-              AND rsi < 30
+              AND rsi < @rsiThreshold
               AND (price < lowerBand OR price > upperBand)
         )
         SELECT 

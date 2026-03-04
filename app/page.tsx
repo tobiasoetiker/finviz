@@ -3,11 +3,12 @@ import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, get
 import { IndustryApiResponse } from '@/types';
 
 interface PageProps {
-  searchParams: Promise<{ snapshot?: string, groupBy?: string, sector?: string, industry?: string, yAxis?: string }>;
+  searchParams: Promise<{ snapshot?: string, groupBy?: string, sector?: string, industry?: string, yAxis?: string, bollingerRsi?: string }>;
 }
 
 export default async function Home({ searchParams }: PageProps) {
-  const { snapshot, groupBy, sector, industry, yAxis } = await searchParams;
+  const { snapshot, groupBy, sector, industry, yAxis, bollingerRsi } = await searchParams;
+  const bollingerRsiThreshold = Math.max(1, Math.min(100, parseInt(bollingerRsi || '30', 10) || 30));
   const groupByParam = (groupBy === 'industry' ? 'industry' : (groupBy === 'ticker' ? 'ticker' : 'sector')) as 'industry' | 'sector' | 'ticker';
 
   // Fetch available snapshots first to determine the fallback default
@@ -21,7 +22,7 @@ export default async function Home({ searchParams }: PageProps) {
   const [sectors, industries, bollingerSignals, ...multiData] = await Promise.all([
     getAvailableSectors(snapshotIds[0]),
     getAvailableIndustries(snapshotIds[0], sector),
-    getBollingerOversoldStocks(snapshotIds[0]),
+    getBollingerOversoldStocks(snapshotIds[0], bollingerRsiThreshold),
     ...snapshotIds.map(id => getIndustryPerformance(id === 'live' ? undefined : id, false, groupByParam, sector, industry))
   ]);
 
@@ -40,6 +41,7 @@ export default async function Home({ searchParams }: PageProps) {
         sectors={sectors}
         industries={industries}
         yAxis={yAxis}
+        bollingerRsiThreshold={bollingerRsiThreshold}
         bollingerSignals={bollingerSignals}
       />
     </main>

@@ -19,9 +19,10 @@ interface Props {
     industries?: string[];
     yAxis?: string;
     bollingerSignals?: BollingerSignalRow[];
+    bollingerRsiThreshold?: number;
 }
 
-export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [] }: Props) {
+export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [], bollingerRsiThreshold = 30 }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
     const [rsiRange, setRsiRange] = useState<[number, number]>([0, 100]);
@@ -123,9 +124,28 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                         Oversold Extremes
                         <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-full tracking-widest uppercase align-middle">Signals</span>
                     </h2>
-                    <p className="text-slate-500 mt-2 text-sm">Stocks with RSI &lt; 30 and price outside the 20-period 2-SD Bollinger Bands.</p>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        <p className="text-slate-500 text-sm">Stocks with RSI below</p>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            defaultValue={bollingerRsiThreshold}
+                            onBlur={(e) => {
+                                const val = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 30));
+                                const params = new URLSearchParams(window.location.search);
+                                params.set('bollingerRsi', String(val));
+                                router.push(`?${params.toString()}`);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            }}
+                            className="w-16 text-center border border-slate-300 rounded-md px-2 py-0.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400"
+                        />
+                        <p className="text-slate-500 text-sm">and price outside the 20-period 2-SD Bollinger Bands.</p>
+                    </div>
                 </div>
-                <BollingerSignals data={bollingerSignals} />
+                <BollingerSignals data={bollingerSignals} rsiThreshold={bollingerRsiThreshold} />
             </div>
 
             {/* Decorative element moved inside the container for better positioning */}
