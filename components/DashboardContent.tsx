@@ -117,14 +117,13 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                 />
             </div>
 
-            {/* Bollinger Signals Standalone Section */}
-            <div className="pt-24 border-t border-slate-100 mt-24">
-                <div className="mb-10">
-                    <h2 className="text-4xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+            <div className="pt-16 border-t border-slate-100 mt-16">
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
                         Oversold Extremes
-                        <span className="px-3 py-1 bg-rose-100 text-rose-700 text-sm font-bold rounded-full tracking-widest uppercase align-middle mt-1">Signals</span>
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-full tracking-widest uppercase align-middle">Signals</span>
                     </h2>
-                    <p className="text-slate-500 mt-3 text-lg">Stocks with RSI &lt; 30 and price outside the 20-period 2-SD Bollinger Bands.</p>
+                    <p className="text-slate-500 mt-2 text-sm">Stocks with RSI &lt; 30 and price outside the 20-period 2-SD Bollinger Bands.</p>
                 </div>
                 <BollingerSignals data={bollingerSignals} />
             </div>
