@@ -380,7 +380,7 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
       </div>
 
       <div
-        className={`w-full h-[600px] select-none ${zoomLevel > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'}`}
+        className={`w-full h-[400px] md:h-[600px] select-none ${zoomLevel > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUpOrLeave}

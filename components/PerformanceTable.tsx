@@ -90,19 +90,19 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors w-32" onClick={() => handleSort('marketCap')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Market Cap</span> <SortIcon column="marketCap" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('change')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden sm:table-cell" onClick={() => handleSort('change')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Daily</span> <SortIcon column="change" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('week')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell" onClick={() => handleSort('week')}>
                                 <div className="flex items-center justify-end space-x-1"><span>1 Week</span> <SortIcon column="week" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('month')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden lg:table-cell" onClick={() => handleSort('month')}>
                                 <div className="flex items-center justify-end space-x-1"><span>1 Month</span> <SortIcon column="month" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('momentum')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Momentum</span> <SortIcon column="momentum" /></div>
                             </th>
-                            <th className="px-6 py-4 text-left">
+                            <th className="px-6 py-4 text-left hidden xl:table-cell">
                                 <div className="flex items-center space-x-1"><span>Top Drivers</span></div>
                             </th>
                         </tr>
@@ -132,13 +132,13 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                                     />
                                     <span className="relative z-10 font-bold text-slate-700">{formatMoney(item.marketCap)}</span>
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-4 text-right hidden sm:table-cell">
                                     <span className={getBadgeClass(item.change)}>{formatPercent(item.change)}</span>
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-4 text-right hidden md:table-cell">
                                     <span className={getBadgeClass(item.week)}>{formatPercent(item.week)}</span>
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-4 text-right hidden lg:table-cell">
                                     <span className={getBadgeClass(item.month)}>{formatPercent(item.month)}</span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
@@ -146,7 +146,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                                         {formatPercent(item.momentum)}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-left">
+                                <td className="px-6 py-4 text-left hidden xl:table-cell">
                                     <div className="flex flex-wrap gap-1.5">
                                         {item.topStocks?.map((stock: { ticker: string; week: number }) => (
                                             <a
