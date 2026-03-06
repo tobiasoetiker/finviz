@@ -1,4 +1,7 @@
+"use client"
+
 import { BollingerSignalRow } from '@/types';
+import { useState, useMemo } from 'react';
 
 const formatMarketCap = (value: number) => {
     if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
@@ -7,7 +10,63 @@ const formatMarketCap = (value: number) => {
     return value.toLocaleString();
 };
 
+type SortKey = keyof BollingerSignalRow | 'distanceFromBand';
+
 export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: BollingerSignalRow[]; rsiThreshold?: number }) {
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+
+    const sortedData = useMemo(() => {
+        if (!data) return [];
+        let sortableItems = [...data];
+        if (sortConfig !== null) {
+            sortableItems.sort((a, b) => {
+                let aValue = a[sortConfig.key];
+                let bValue = b[sortConfig.key];
+
+                if (aValue === undefined) aValue = '';
+                if (bValue === undefined) bValue = '';
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableItems;
+    }, [data, sortConfig]);
+
+    const requestSort = (key: SortKey) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIndicator = (key: SortKey) => {
+        if (!sortConfig || sortConfig.key !== key) return null;
+        return (
+            <span className="ml-1 inline-block text-[10px] text-slate-400">
+                {sortConfig.direction === 'asc' ? '▲' : '▼'}
+            </span>
+        );
+    };
+
+    const HeaderCell = ({ label, sortKey, alignRight = false, hiddenClass = '' }: { label: string, sortKey: SortKey, alignRight?: boolean, hiddenClass?: string }) => (
+        <th
+            className={`py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors ${alignRight ? 'text-right' : ''} ${hiddenClass}`}
+            onClick={() => requestSort(sortKey)}
+        >
+            <div className={`flex items-center ${alignRight ? 'justify-end' : ''}`}>
+                {label}
+                {getSortIndicator(sortKey)}
+            </div>
+        </th>
+    );
+
     if (!data || data.length === 0) {
         return (
             <div className="py-10 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
@@ -21,17 +80,17 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap">Ticker</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap">Company</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap hidden sm:table-cell">Sector</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right">Price</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right">RSI</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right hidden md:table-cell">Market Cap</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap text-right">Distance</th>
+                        <HeaderCell label="Ticker" sortKey="ticker" />
+                        <HeaderCell label="Company" sortKey="company" />
+                        <HeaderCell label="Sector" sortKey="sector" hiddenClass="hidden sm:table-cell" />
+                        <HeaderCell label="Price" sortKey="price" alignRight />
+                        <HeaderCell label="RSI" sortKey="rsi" alignRight />
+                        <HeaderCell label="Market Cap" sortKey="marketCap" alignRight hiddenClass="hidden md:table-cell" />
+                        <HeaderCell label="Distance" sortKey="distanceFromBand" alignRight />
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {data.map((row) => (
+                    {sortedData.map((row) => (
                         <tr key={row.ticker} className="hover:bg-slate-50 transition-colors">
                             <td className="py-3 px-4">
                                 <a
