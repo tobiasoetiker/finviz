@@ -1,4 +1,16 @@
-# Version: 1.0.1
+# Version: 1.2.0
+# FINVIZ_API_KEY is stored in GCP Secret Manager (not in env vars).
+# Create it once:  gcloud secrets create FINVIZ_API_KEY --data-file=-
+# Grant access:    gcloud secrets add-iam-policy-binding FINVIZ_API_KEY \
+#                    --member="serviceAccount:PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
+#                    --role="roles/secretmanager.secretAccessor"
+#
+# The function requires authentication (no --allow-unauthenticated).
+# To invoke it via Cloud Scheduler, create a service account and grant it
+# roles/cloudfunctions.invoker on this function:
+#   gcloud functions add-invoker-policy-binding finviz-processor \
+#     --region=us-central1 \
+#     --member="serviceAccount:SCHEDULER_SA@finviz-487509.iam.gserviceaccount.com"
 steps:
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   args:
@@ -11,10 +23,11 @@ steps:
   - --source=./backend
   - --entry-point=process_finviz_data
   - --trigger-http
-  - --allow-unauthenticated
+  - --no-allow-unauthenticated
   - --memory=512MB
   - --timeout=540s
-  - --set-env-vars=PROJECT_ID=finviz-487509,RAW_BUCKET_NAME=finviz-raw-data-1212546082,BQ_DATASET=stock_data,BQ_TABLE=processed_stock_data,FINVIZ_API_KEY=19270963-96d2-430d-adfe-14220d9fd013
+  - --set-env-vars=PROJECT_ID=finviz-487509,RAW_BUCKET_NAME=finviz-raw-data-1212546082,BQ_DATASET=stock_data,BQ_TABLE=processed_stock_data
+  - --set-secrets=FINVIZ_API_KEY=FINVIZ_API_KEY:latest
 
 options:
   logging: CLOUD_LOGGING_ONLY

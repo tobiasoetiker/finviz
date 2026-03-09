@@ -1,5 +1,5 @@
 import DashboardContent from '@/components/DashboardContent';
-import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, getAvailableIndustries, getBollingerOversoldStocks } from '@/lib/finviz';
+import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, getAvailableIndustries, getBollingerOversoldStocks, getBollingerBacktest } from '@/lib/finviz';
 import { IndustryApiResponse } from '@/types';
 
 interface PageProps {
@@ -18,12 +18,23 @@ export default async function Home({ searchParams }: PageProps) {
   // Handle multiple snapshots (comma separated IDs)
   const snapshotIds = snapshot ? snapshot.split(',') : [defaultSnapshotId];
 
-  // Fetch data for all snapshots in parallel
-  const [sectors, industries, bollingerSignals, ...multiData] = await Promise.all([
+  // Fetch primary data (sectors, industries, performance) — errors here should break the page
+  const [sectors, industries, ...multiData] = await Promise.all([
     getAvailableSectors(snapshotIds[0]),
     getAvailableIndustries(snapshotIds[0], sector),
-    getBollingerOversoldStocks(snapshotIds[0], bollingerRsiThreshold),
     ...snapshotIds.map(id => getIndustryPerformance(id === 'live' ? undefined : id, false, groupByParam, sector, industry))
+  ]);
+
+  // Fetch Bollinger data separately — failures here degrade gracefully without breaking the dashboard
+  const [bollingerSignals, bollingerBacktest] = await Promise.all([
+    getBollingerOversoldStocks(snapshotIds[0], bollingerRsiThreshold).catch((error) => {
+      console.error('Bollinger signals failed (dashboard will render without them):', error);
+      return [];
+    }),
+    getBollingerBacktest(snapshotIds[0], bollingerRsiThreshold).catch((error) => {
+      console.error('Bollinger backtest failed (dashboard will render without it):', error);
+      return undefined;
+    }),
   ]);
 
   // Create a mapping of snapshot ID to data
@@ -43,6 +54,7 @@ export default async function Home({ searchParams }: PageProps) {
         yAxis={yAxis}
         bollingerRsiThreshold={bollingerRsiThreshold}
         bollingerSignals={bollingerSignals}
+        bollingerBacktest={bollingerBacktest}
       />
     </main>
   );

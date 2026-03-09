@@ -1,12 +1,39 @@
 'use server';
 
-import { IndustryApiResponse, IndustryRow, BollingerSignalRow } from '@/types';
+import { IndustryApiResponse, IndustryRow, BollingerSignalRow, BollingerBacktestRow } from '@/types';
 import { revalidatePath, unstable_cache } from 'next/cache';
 import { config } from './config';
 import { queryBigQuery } from './bigquery';
 
-// Memory cache (optional/secondary now that we verify disk)
-let cachedData: IndustryApiResponse | null = null;
+// BigQuery returns all-lowercase column names. This type represents the raw row shape.
+interface BigQueryIndustryRow {
+    name?: string; industry?: string; sector?: string; ticker?: string;
+    processed_at: string | { value: string };
+    change?: number; week?: number; month?: number; rsi?: number; momentum?: number;
+    changeequal?: number; weekequal?: number; monthequal?: number; rsiequal?: number; momentumequal?: number;
+    marketcap?: number; stockcount?: number; topstocks?: { ticker: string; week: number }[];
+}
+
+interface BigQueryBollingerRow {
+    ticker: string; company?: string; sector?: string; industry?: string;
+    price?: number; rsi?: number; marketCap?: number; market_cap_val?: number;
+    sma20?: number; stddev20?: number; lowerBand?: number; upperBand?: number;
+    distanceFromBand?: number; bandSide?: string;
+    processed_at: string | { value: string };
+}
+
+interface BigQueryBacktestRow {
+    ticker: string; company?: string; sector?: string;
+    signalPrice?: number; signalRsi?: number; signalBandSide?: string;
+    signalDistanceFromBand?: number; currentPrice?: number;
+    returnPct?: number; spyReturnPct?: number; excessReturnPct?: number;
+}
+
+function parseTimestamp(val: string | { value: string } | null | undefined): number | null {
+    if (!val) return null;
+    const str = typeof val === 'string' ? val : val.value;
+    return new Date(str).getTime();
+}
 
 export async function refreshMarketData() {
     console.log('Force refreshing market data...');
@@ -159,53 +186,30 @@ export const getIndustryPerformance = async (
         if (sectorFilter) params.sectorFilter = sectorFilter;
         if (industryFilter) params.industryFilter = industryFilter;
 
-        const results = await queryBigQuery(query, Object.keys(params).length > 0 ? params : undefined) as (IndustryRow & { processed_at: string | { value: string } })[];
-
-        console.log("DEBUG QUERY EXECUTION:", {
-            groupBy,
-            tableName: groupBy === 'industry' ? 'industry_history' : 'sector_history',
-            params,
-            resultsLength: results.length
-        });
+        const results = await queryBigQuery<BigQueryIndustryRow>(query, Object.keys(params).length > 0 ? params : undefined);
 
         // Use the actual processed_at from the data if available, otherwise fallback
         const firstRow = results.length > 0 ? results[0] : null;
-        let dataTimestamp = Date.now();
+        const dataTimestamp = parseTimestamp(firstRow?.processed_at) ?? Date.now();
 
-        if (firstRow && firstRow.processed_at) {
-            const val = typeof firstRow.processed_at === 'string' ? firstRow.processed_at : firstRow.processed_at.value;
-            dataTimestamp = new Date(val).getTime();
-        }
-
-        // Clean data for client serialization
-        const cleanResults = results.map((row: any) => {
-            const timestampVal = typeof row.processed_at === 'string' ? row.processed_at : row.processed_at?.value;
-            let processedAtTs = null;
-            if (timestampVal) {
-                processedAtTs = new Date(timestampVal).getTime();
-            }
-
-            return {
-                ...row,
-                name: row.name || (groupBy === 'industry' ? row.industry : row.sector),
-                processed_at: processedAtTs,
-                // Explicitly map properties that might be returned lowercase by BigQuery
-                changeEqual: row.changeEqual ?? row.changeequal,
-                weekEqual: row.weekEqual ?? row.weekequal,
-                monthEqual: row.monthEqual ?? row.monthequal,
-                rsiEqual: row.rsiEqual ?? row.rsiequal,
-                momentumEqual: row.momentumEqual ?? row.momentumequal,
-                marketCap: row.marketCap ?? row.marketcap,
-                stockCount: row.stockCount ?? row.stockcount,
-                topStocks: row.topStocks ?? row.topstocks,
-                // Fallbacks for primary metrics to avoid NaN filtering errors if somehow missing
-                momentum: row.momentum ?? 0,
-                change: row.change ?? 0,
-                week: row.week ?? 0,
-                month: row.month ?? 0,
-                rsi: row.rsi ?? 0
-            };
-        });
+        // Map BigQuery lowercase columns to camelCase IndustryRow
+        const cleanResults = results.map((row) => ({
+            name: row.name || (groupBy === 'industry' ? row.industry : row.sector) || '',
+            change: row.change ?? 0,
+            week: row.week ?? 0,
+            month: row.month ?? 0,
+            rsi: row.rsi ?? 0,
+            momentum: row.momentum ?? 0,
+            changeEqual: row.changeequal ?? 0,
+            weekEqual: row.weekequal ?? 0,
+            monthEqual: row.monthequal ?? 0,
+            rsiEqual: row.rsiequal ?? 0,
+            momentumEqual: row.momentumequal ?? 0,
+            volume: 0,
+            marketCap: row.marketcap ?? 0,
+            stockCount: row.stockcount ?? 0,
+            topStocks: row.topstocks ?? [],
+        }));
 
         return {
             data: cleanResults as IndustryRow[],
@@ -227,25 +231,36 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
         params.rsiThreshold = rsiThreshold;
 
         const query = `
-        WITH HistoricalPrices AS (
-            SELECT 
-                ticker, company, sector, industry, processed_at, is_current, relative_strength_index_14 as rsi,
-                SAFE_CAST(price AS FLOAT64) as price_val,
-                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as market_cap_val
+        WITH RecentSnapshots AS (
+            -- Only fetch the last 25 snapshots (enough for 20-period SMA + buffer)
+            SELECT DISTINCT processed_at
             FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
-            WHERE ticker IS NOT NULL AND price IS NOT NULL
+            ${snapshotId && snapshotId !== 'live'
+                ? `WHERE CAST(processed_at AS STRING) <= @snapshotId`
+                : ''}
+            ORDER BY processed_at DESC
+            LIMIT 25
+        ),
+        HistoricalPrices AS (
+            SELECT
+                h.ticker, h.company, h.sector, h.industry, h.processed_at, h.is_current, h.relative_strength_index_14 as rsi,
+                SAFE_CAST(h.price AS FLOAT64) as price_val,
+                SAFE_CAST(h.market_cap AS FLOAT64) * 1000000 as market_cap_val
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\` h
+            INNER JOIN RecentSnapshots rs ON h.processed_at = rs.processed_at
+            WHERE h.ticker IS NOT NULL AND h.price IS NOT NULL
         ),
         CalculatedBands AS (
-            SELECT 
+            SELECT
                 *,
                 AVG(price_val) OVER (
-                    PARTITION BY ticker 
-                    ORDER BY processed_at 
+                    PARTITION BY ticker
+                    ORDER BY processed_at
                     ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
                 ) as sma20,
                 STDDEV_SAMP(price_val) OVER (
-                    PARTITION BY ticker 
-                    ORDER BY processed_at 
+                    PARTITION BY ticker
+                    ORDER BY processed_at
                     ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
                 ) as stddev20
             FROM HistoricalPrices
@@ -307,6 +322,178 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
 
     } catch (error) {
         console.error('Error fetching Bollinger signals:', error);
-        return [];
+        throw error;
+    }
+};
+
+export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThreshold: number = 30): Promise<{ rows: BollingerBacktestRow[]; signalDate: string; currentDate: string }> => {
+    try {
+        console.log(`Fetching Bollinger backtest from BigQuery...`);
+
+        // Step 1: Get recent snapshot dates and find the last pair with different prices
+        // (weekend snapshots have the same Friday data, so we need to skip those)
+        const snapshotQuery = `
+            WITH snapshots AS (
+                SELECT
+                    CAST(processed_at AS STRING) as snapshot_date,
+                    -- Sample a few large-cap tickers to detect price changes
+                    MAX(CASE WHEN ticker = 'AAPL' THEN price END) as sample_price
+                FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+                ${currentSnapshotId && currentSnapshotId !== 'live'
+                    ? `WHERE CAST(processed_at AS STRING) <= @currentSnapshotId`
+                    : ''}
+                GROUP BY snapshot_date
+                ORDER BY snapshot_date DESC
+                LIMIT 10
+            )
+            SELECT snapshot_date, sample_price FROM snapshots ORDER BY snapshot_date DESC
+        `;
+
+        const snapshotParams = (currentSnapshotId && currentSnapshotId !== 'live')
+            ? { currentSnapshotId }
+            : undefined;
+
+        const snapshotRows = await queryBigQuery(snapshotQuery, snapshotParams) as { snapshot_date: string | { value: string }; sample_price: string | null }[];
+
+        if (snapshotRows.length < 2) {
+            return { rows: [], signalDate: '', currentDate: '' };
+        }
+
+        // Find the first pair of snapshots with different sample prices (= different trading days)
+        const getVal = (row: typeof snapshotRows[number]) => typeof row.snapshot_date === 'string' ? row.snapshot_date : row.snapshot_date.value;
+        let currentDate = getVal(snapshotRows[0]);
+        let previousDate = '';
+        const currentSamplePrice = snapshotRows[0].sample_price;
+
+        for (let i = 1; i < snapshotRows.length; i++) {
+            if (snapshotRows[i].sample_price !== currentSamplePrice) {
+                previousDate = getVal(snapshotRows[i]);
+                break;
+            }
+        }
+
+        if (!previousDate) {
+            // All snapshots have the same price (extended weekend/holiday) — fall back to most recent pair
+            previousDate = getVal(snapshotRows[1]);
+        }
+
+        console.log(`Bollinger backtest: comparing ${previousDate} -> ${currentDate}`);
+
+        // Step 2: Find stocks that had Bollinger signals on the previous date and their current prices
+        // Use market-cap-weighted average return of all stocks as market proxy (since SPY/ETFs aren't in the dataset)
+        const backtestQuery = `
+        WITH RecentSnapshots AS (
+            -- Only fetch the last 25 snapshots up to previousDate (enough for 20-period SMA)
+            SELECT DISTINCT processed_at
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+            WHERE CAST(processed_at AS STRING) <= @previousDate
+            ORDER BY processed_at DESC
+            LIMIT 25
+        ),
+        AllHistory AS (
+            SELECT
+                h.ticker,
+                SAFE_CAST(h.price AS FLOAT64) as price_val,
+                h.processed_at
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\` h
+            INNER JOIN RecentSnapshots rs ON h.processed_at = rs.processed_at
+            WHERE h.ticker IS NOT NULL AND h.price IS NOT NULL
+        ),
+        PrevSnapshot AS (
+            SELECT
+                ticker, company, sector, industry,
+                SAFE_CAST(price AS FLOAT64) as price_val,
+                SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
+                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as market_cap_val
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+            WHERE CAST(processed_at AS STRING) = @previousDate
+              AND ticker IS NOT NULL AND price IS NOT NULL
+        ),
+        PrevBands AS (
+            SELECT
+                p.ticker, p.company, p.sector, p.price_val, p.rsi, p.market_cap_val,
+                AVG(h.price_val) as sma20,
+                STDDEV_SAMP(h.price_val) as stddev20
+            FROM PrevSnapshot p
+            JOIN AllHistory h ON p.ticker = h.ticker
+            GROUP BY p.ticker, p.company, p.sector, p.price_val, p.rsi, p.market_cap_val
+            HAVING COUNT(h.price_val) >= 10
+        ),
+        PrevSignals AS (
+            SELECT
+                ticker, company, sector, price_val as signalPrice, rsi as signalRsi,
+                CASE WHEN price_val < (sma20 - 2 * stddev20) THEN 'lower' ELSE 'upper' END as bandSide,
+                CASE
+                    WHEN price_val < (sma20 - 2 * stddev20) THEN (((sma20 - 2 * stddev20) - price_val) / (sma20 - 2 * stddev20)) * 100
+                    ELSE ((price_val - (sma20 + 2 * stddev20)) / (sma20 + 2 * stddev20)) * 100
+                END as distanceFromBand
+            FROM PrevBands
+            WHERE rsi < @rsiThreshold
+              AND (price_val < (sma20 - 2 * stddev20) OR price_val > (sma20 + 2 * stddev20))
+              AND stddev20 IS NOT NULL
+        ),
+        CurrentSnapshot AS (
+            SELECT
+                ticker,
+                SAFE_CAST(price AS FLOAT64) as currentPrice,
+                SAFE_CAST(market_cap AS FLOAT64) * 1000000 as market_cap_val
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+            WHERE CAST(processed_at AS STRING) = @currentDate
+              AND ticker IS NOT NULL AND price IS NOT NULL
+        ),
+        MarketReturn AS (
+            SELECT
+                SAFE_DIVIDE(
+                    SUM((c.currentPrice - p.price_val) / p.price_val * p.market_cap_val),
+                    SUM(p.market_cap_val)
+                ) * 100 as marketReturn
+            FROM PrevSnapshot p
+            JOIN CurrentSnapshot c ON p.ticker = c.ticker
+            WHERE p.price_val > 0 AND p.market_cap_val > 0
+        )
+        SELECT
+            s.ticker, s.company, s.sector,
+            s.signalPrice, s.signalRsi, s.bandSide as signalBandSide,
+            s.distanceFromBand as signalDistanceFromBand,
+            c.currentPrice,
+            (c.currentPrice - s.signalPrice) / s.signalPrice * 100 as returnPct,
+            COALESCE(m.marketReturn, 0) as spyReturnPct,
+            (c.currentPrice - s.signalPrice) / s.signalPrice * 100 - COALESCE(m.marketReturn, 0) as excessReturnPct
+        FROM PrevSignals s
+        JOIN CurrentSnapshot c ON s.ticker = c.ticker
+        CROSS JOIN MarketReturn m
+        ORDER BY returnPct DESC
+        `;
+
+        const backtestParams: Record<string, string | number> = {
+            previousDate,
+            currentDate,
+            rsiThreshold
+        };
+
+        const results = await queryBigQuery(backtestQuery, backtestParams) as any[];
+
+        console.log(`Bollinger backtest: found ${results.length} results`);
+
+        const rows: BollingerBacktestRow[] = results.map(row => ({
+            ticker: row.ticker,
+            company: row.company || row.ticker,
+            sector: row.sector || 'Unknown',
+            signalPrice: row.signalPrice || 0,
+            signalRsi: row.signalRsi || 0,
+            signalBandSide: row.signalBandSide as 'lower' | 'upper',
+            signalDistanceFromBand: row.signalDistanceFromBand || 0,
+            currentPrice: row.currentPrice || 0,
+            returnPct: row.returnPct || 0,
+            spyReturnPct: row.spyReturnPct || 0,
+            excessReturnPct: row.excessReturnPct || 0,
+            signalDate: previousDate
+        }));
+
+        return { rows, signalDate: previousDate, currentDate };
+
+    } catch (error) {
+        console.error('Error fetching Bollinger backtest:', error);
+        throw error;
     }
 };

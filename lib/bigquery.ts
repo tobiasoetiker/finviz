@@ -11,7 +11,7 @@ if (creds) {
     console.warn('BigQuery not configured. Ensure GCP environment variables are set.');
 }
 
-export async function queryBigQuery(query: string, params?: any) {
+export async function queryBigQuery<T = Record<string, unknown>>(query: string, params?: Record<string, string | number>): Promise<T[]> {
     if (!bigquery) {
         throw new Error('BigQuery client not initialized');
     }
@@ -23,15 +23,5 @@ export async function queryBigQuery(query: string, params?: any) {
     };
 
     const [rows] = await bigquery.query(options);
-    return rows;
-}
-
-export async function getLatestProcessedData() {
-    const query = `
-        SELECT *
-        FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
-        WHERE is_current = 'yes'
-        LIMIT 1000
-    `;
-    return queryBigQuery(query);
+    return rows as T[];
 }

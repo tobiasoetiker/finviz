@@ -6,10 +6,10 @@ import { IndustryApiResponse } from '@/types';
 import { refreshMarketData } from '@/lib/finviz';
 import PerformanceTable from './PerformanceTable';
 import MomentumMatrix from './MomentumMatrix';
-import MarketMonitor from './MarketMonitor';
 import ControlBar from './ControlBar';
 import BollingerSignals from './BollingerSignals';
-import { BollingerSignalRow } from '@/types';
+import BollingerBacktest from './BollingerBacktest';
+import { BollingerSignalRow, BollingerBacktestRow } from '@/types';
 
 interface Props {
     data: IndustryApiResponse;
@@ -20,9 +20,10 @@ interface Props {
     yAxis?: string;
     bollingerSignals?: BollingerSignalRow[];
     bollingerRsiThreshold?: number;
+    bollingerBacktest?: { rows: BollingerBacktestRow[]; signalDate: string; currentDate: string };
 }
 
-export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [], bollingerRsiThreshold = 30 }: Props) {
+export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [], bollingerRsiThreshold = 30, bollingerBacktest }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
     const [rsiRange, setRsiRange] = useState<[number, number]>([0, 100]);
@@ -58,7 +59,7 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
         week: weighting === 'equal' ? item.weekEqual : item.week,
         month: weighting === 'equal' ? item.monthEqual : item.month,
         momentum: weighting === 'equal' ? item.momentumEqual : item.momentum,
-        rsi: weighting === 'equal' ? (item as any).rsiEqual : (item as any).rsi
+        rsi: weighting === 'equal' ? item.rsiEqual : item.rsi
     }));
 
     // Apply RSI Filtering
@@ -147,6 +148,21 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                 </div>
                 <BollingerSignals data={bollingerSignals} rsiThreshold={bollingerRsiThreshold} />
             </div>
+
+            {bollingerBacktest && (
+                <div className="pt-16 border-t border-slate-100 mt-16">
+                    <div className="mb-6">
+                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                            Signal Backtest
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full tracking-widest uppercase align-middle">1-Day</span>
+                        </h2>
+                        <p className="text-slate-500 text-sm mt-2">
+                            Stocks that triggered oversold signals on the previous snapshot and how they performed since, relative to the market.
+                        </p>
+                    </div>
+                    <BollingerBacktest data={bollingerBacktest.rows} signalDate={bollingerBacktest.signalDate} currentDate={bollingerBacktest.currentDate} />
+                </div>
+            )}
 
             {/* Decorative element moved inside the container for better positioning */}
             <div className="opacity-10 pointer-events-none select-none fixed bottom-10 left-10 -z-10">

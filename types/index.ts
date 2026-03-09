@@ -90,3 +90,18 @@ export interface BollingerSignalRow {
   bandSide: 'lower' | 'upper';
   processedAt: number;
 }
+
+export interface BollingerBacktestRow {
+  ticker: string;
+  company: string;
+  sector: string;
+  signalPrice: number;
+  signalRsi: number;
+  signalBandSide: 'lower' | 'upper';
+  signalDistanceFromBand: number;
+  currentPrice: number;
+  returnPct: number;
+  spyReturnPct: number;
+  excessReturnPct: number;
+  signalDate: string;
+}
