@@ -66,6 +66,27 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
     const spyReturn = data.length > 0 ? data[0].spyReturnPct : 0;
     const winnersCount = data.filter(r => r.returnPct > 0).length;
 
+    // Pearson correlation between signal RSI and excess return
+    // Negative = lower RSI performs better, Positive = higher RSI performs better
+    const rsiReturnCorr = useMemo(() => {
+        if (data.length < 3) return null;
+        const n = data.length;
+        const rsis = data.map(r => r.signalRsi);
+        const rets = data.map(r => r.excessReturnPct);
+        const meanRsi = rsis.reduce((a, b) => a + b, 0) / n;
+        const meanRet = rets.reduce((a, b) => a + b, 0) / n;
+        let num = 0, denRsi = 0, denRet = 0;
+        for (let i = 0; i < n; i++) {
+            const dRsi = rsis[i] - meanRsi;
+            const dRet = rets[i] - meanRet;
+            num += dRsi * dRet;
+            denRsi += dRsi * dRsi;
+            denRet += dRet * dRet;
+        }
+        const den = Math.sqrt(denRsi * denRet);
+        return den === 0 ? 0 : num / den;
+    }, [data]);
+
     const formatDateLabel = (dateStr: string) => {
         if (!dateStr) return '';
         return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -82,7 +103,7 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
     return (
         <div className="space-y-4">
             {/* Summary cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                     <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Signals</div>
                     <div className="text-lg font-bold text-slate-900">{data.length}</div>
@@ -102,6 +123,17 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
                     <div className={`text-lg font-bold ${pctColor(avgExcess)}`}>{formatPct(avgExcess)}</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">Mkt: {formatPct(spyReturn)}</div>
                 </div>
+                {rsiReturnCorr !== null && (
+                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                        <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">RSI Edge</div>
+                        <div className={`text-lg font-bold ${rsiReturnCorr < -0.1 ? 'text-emerald-600' : rsiReturnCorr > 0.1 ? 'text-amber-600' : 'text-slate-500'}`}>
+                            {rsiReturnCorr.toFixed(2)}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                            {rsiReturnCorr < -0.1 ? 'Lower RSI better' : rsiReturnCorr > 0.1 ? 'Higher RSI better' : 'No clear edge'}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Table */}
