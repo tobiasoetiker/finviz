@@ -437,6 +437,7 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
             SELECT
                 ticker,
                 SAFE_CAST(price AS FLOAT64) as currentPrice,
+                SAFE_CAST(relative_strength_index_14 AS FLOAT64) as currentRsi,
                 SAFE_CAST(market_cap AS FLOAT64) * 1000000 as market_cap_val
             FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
             WHERE CAST(processed_at AS STRING) = @currentDate
@@ -456,7 +457,7 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
             s.ticker, s.company, s.sector,
             s.signalPrice, s.signalRsi, s.bandSide as signalBandSide,
             s.distanceFromBand as signalDistanceFromBand,
-            c.currentPrice,
+            c.currentPrice, c.currentRsi,
             (c.currentPrice - s.signalPrice) / s.signalPrice * 100 as returnPct,
             COALESCE(m.marketReturn, 0) as spyReturnPct,
             (c.currentPrice - s.signalPrice) / s.signalPrice * 100 - COALESCE(m.marketReturn, 0) as excessReturnPct
@@ -485,6 +486,7 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
             signalBandSide: row.signalBandSide as 'lower' | 'upper',
             signalDistanceFromBand: row.signalDistanceFromBand || 0,
             currentPrice: row.currentPrice || 0,
+            currentRsi: row.currentRsi || 0,
             returnPct: row.returnPct || 0,
             spyReturnPct: row.spyReturnPct || 0,
             excessReturnPct: row.excessReturnPct || 0,

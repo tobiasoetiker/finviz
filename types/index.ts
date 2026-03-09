@@ -100,6 +100,7 @@ export interface BollingerBacktestRow {
   signalBandSide: 'lower' | 'upper';
   signalDistanceFromBand: number;
   currentPrice: number;
+  currentRsi: number;
   returnPct: number;
   spyReturnPct: number;
   excessReturnPct: number;

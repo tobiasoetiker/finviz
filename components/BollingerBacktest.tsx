@@ -112,8 +112,9 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
                             <HeaderCell label="Ticker" sortKey="ticker" />
                             <HeaderCell label="Company" sortKey="company" hiddenClass="hidden sm:table-cell" />
                             <HeaderCell label="Sector" sortKey="sector" hiddenClass="hidden md:table-cell" />
-                            <HeaderCell label="Signal RSI" sortKey="signalRsi" alignRight />
-                            <HeaderCell label="Signal Price" sortKey="signalPrice" alignRight hiddenClass="hidden sm:table-cell" />
+                            <HeaderCell label="Entry RSI" sortKey="signalRsi" alignRight />
+                            <HeaderCell label="Current RSI" sortKey="currentRsi" alignRight />
+                            <HeaderCell label="Entry Price" sortKey="signalPrice" alignRight hiddenClass="hidden sm:table-cell" />
                             <HeaderCell label="Current Price" sortKey="currentPrice" alignRight />
                             <HeaderCell label="Return" sortKey="returnPct" alignRight />
                             <HeaderCell label="vs Mkt" sortKey="excessReturnPct" alignRight />
@@ -141,6 +142,15 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
                                 <td className="py-3 px-4 text-right">
                                     <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded tabular-nums text-xs">
                                         {row.signalRsi.toFixed(1)}
+                                    </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                    <span className={`font-bold px-2 py-0.5 rounded tabular-nums text-xs ${
+                                        row.currentRsi > row.signalRsi
+                                            ? 'text-emerald-600 bg-emerald-50'
+                                            : 'text-rose-600 bg-rose-50'
+                                    }`}>
+                                        {row.currentRsi.toFixed(1)}
                                     </span>
                                 </td>
                                 <td className="py-3 px-4 font-bold text-slate-900 tabular-nums text-xs text-right hidden sm:table-cell">
