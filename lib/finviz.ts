@@ -326,17 +326,15 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
     }
 };
 
-export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThreshold: number = 30): Promise<{ rows: BollingerBacktestRow[]; signalDate: string; currentDate: string }> => {
+export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThreshold: number = 30, lookbackDays: number = 1): Promise<{ rows: BollingerBacktestRow[]; signalDate: string; currentDate: string }> => {
     try {
-        console.log(`Fetching Bollinger backtest from BigQuery...`);
+        console.log(`Fetching Bollinger backtest (${lookbackDays}d) from BigQuery...`);
 
-        // Step 1: Get recent snapshot dates and find the last pair with different prices
-        // (weekend snapshots have the same Friday data, so we need to skip those)
+        // Step 1: Get recent snapshot dates, deduplicating by trading day (weekends have same prices)
         const snapshotQuery = `
             WITH snapshots AS (
                 SELECT
                     CAST(processed_at AS STRING) as snapshot_date,
-                    -- Sample a few large-cap tickers to detect price changes
                     MAX(CASE WHEN ticker = 'AAPL' THEN price END) as sample_price
                 FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
                 ${currentSnapshotId && currentSnapshotId !== 'live'
@@ -344,7 +342,7 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
                     : ''}
                 GROUP BY snapshot_date
                 ORDER BY snapshot_date DESC
-                LIMIT 10
+                LIMIT 20
             )
             SELECT snapshot_date, sample_price FROM snapshots ORDER BY snapshot_date DESC
         `;
@@ -359,25 +357,28 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
             return { rows: [], signalDate: '', currentDate: '' };
         }
 
-        // Find the first pair of snapshots with different sample prices (= different trading days)
+        // Deduplicate snapshots to unique trading days (different sample prices)
         const getVal = (row: typeof snapshotRows[number]) => typeof row.snapshot_date === 'string' ? row.snapshot_date : row.snapshot_date.value;
-        let currentDate = getVal(snapshotRows[0]);
-        let previousDate = '';
-        const currentSamplePrice = snapshotRows[0].sample_price;
+        const tradingDays: string[] = [getVal(snapshotRows[0])];
+        let lastPrice = snapshotRows[0].sample_price;
 
         for (let i = 1; i < snapshotRows.length; i++) {
-            if (snapshotRows[i].sample_price !== currentSamplePrice) {
-                previousDate = getVal(snapshotRows[i]);
-                break;
+            if (snapshotRows[i].sample_price !== lastPrice) {
+                tradingDays.push(getVal(snapshotRows[i]));
+                lastPrice = snapshotRows[i].sample_price;
             }
         }
 
-        if (!previousDate) {
-            // All snapshots have the same price (extended weekend/holiday) — fall back to most recent pair
-            previousDate = getVal(snapshotRows[1]);
+        // Need at least lookbackDays + 1 trading days (current + N days back)
+        const clampedLookback = Math.min(lookbackDays, tradingDays.length - 1);
+        if (clampedLookback < 1) {
+            return { rows: [], signalDate: '', currentDate: '' };
         }
 
-        console.log(`Bollinger backtest: comparing ${previousDate} -> ${currentDate}`);
+        const currentDate = tradingDays[0];
+        const previousDate = tradingDays[clampedLookback];
+
+        console.log(`Bollinger backtest: comparing ${previousDate} -> ${currentDate} (${clampedLookback} trading days)`);
 
         // Step 2: Find stocks that had Bollinger signals on the previous date and their current prices
         // Use market-cap-weighted average return of all stocks as market proxy (since SPY/ETFs aren't in the dataset)

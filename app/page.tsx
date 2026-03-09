@@ -3,12 +3,13 @@ import { getAvailableSnapshots, getIndustryPerformance, getAvailableSectors, get
 import { IndustryApiResponse } from '@/types';
 
 interface PageProps {
-  searchParams: Promise<{ snapshot?: string, groupBy?: string, sector?: string, industry?: string, yAxis?: string, bollingerRsi?: string }>;
+  searchParams: Promise<{ snapshot?: string, groupBy?: string, sector?: string, industry?: string, yAxis?: string, bollingerRsi?: string, backtestDays?: string }>;
 }
 
 export default async function Home({ searchParams }: PageProps) {
-  const { snapshot, groupBy, sector, industry, yAxis, bollingerRsi } = await searchParams;
+  const { snapshot, groupBy, sector, industry, yAxis, bollingerRsi, backtestDays } = await searchParams;
   const bollingerRsiThreshold = Math.max(1, Math.min(100, parseInt(bollingerRsi || '30', 10) || 30));
+  const backtestLookback = Math.max(1, Math.min(5, parseInt(backtestDays || '1', 10) || 1));
   const groupByParam = (groupBy === 'industry' ? 'industry' : (groupBy === 'ticker' ? 'ticker' : 'sector')) as 'industry' | 'sector' | 'ticker';
 
   // Fetch available snapshots first to determine the fallback default
@@ -31,7 +32,7 @@ export default async function Home({ searchParams }: PageProps) {
       console.error('Bollinger signals failed (dashboard will render without them):', error);
       return [];
     }),
-    getBollingerBacktest(snapshotIds[0], bollingerRsiThreshold).catch((error) => {
+    getBollingerBacktest(snapshotIds[0], bollingerRsiThreshold, backtestLookback).catch((error) => {
       console.error('Bollinger backtest failed (dashboard will render without it):', error);
       return undefined;
     }),
@@ -53,6 +54,7 @@ export default async function Home({ searchParams }: PageProps) {
         industries={industries}
         yAxis={yAxis}
         bollingerRsiThreshold={bollingerRsiThreshold}
+        backtestDays={backtestLookback}
         bollingerSignals={bollingerSignals}
         bollingerBacktest={bollingerBacktest}
       />

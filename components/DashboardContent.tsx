@@ -20,10 +20,11 @@ interface Props {
     yAxis?: string;
     bollingerSignals?: BollingerSignalRow[];
     bollingerRsiThreshold?: number;
+    backtestDays?: number;
     bollingerBacktest?: { rows: BollingerBacktestRow[]; signalDate: string; currentDate: string };
 }
 
-export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [], bollingerRsiThreshold = 30, bollingerBacktest }: Props) {
+export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis, bollingerSignals = [], bollingerRsiThreshold = 30, backtestDays = 1, bollingerBacktest }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
     const [rsiRange, setRsiRange] = useState<[number, number]>([0, 100]);
@@ -154,11 +155,30 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                     <div className="mb-6">
                         <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
                             Signal Backtest
-                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full tracking-widest uppercase align-middle">1-Day</span>
                         </h2>
-                        <p className="text-slate-500 text-sm mt-2">
-                            Stocks that triggered oversold signals on the previous snapshot and how they performed since, relative to the market.
-                        </p>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            <p className="text-slate-500 text-sm">Performance over</p>
+                            <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((d) => (
+                                    <button
+                                        key={d}
+                                        onClick={() => {
+                                            const params = new URLSearchParams(window.location.search);
+                                            params.set('backtestDays', String(d));
+                                            router.push(`?${params.toString()}`);
+                                        }}
+                                        className={`px-2.5 py-0.5 rounded-md text-xs font-semibold transition-colors ${
+                                            backtestDays === d
+                                                ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                                                : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {d}d
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-slate-500 text-sm">trading days since oversold signal, relative to market.</p>
+                        </div>
                     </div>
                     <BollingerBacktest data={bollingerBacktest.rows} signalDate={bollingerBacktest.signalDate} currentDate={bollingerBacktest.currentDate} />
                 </div>
