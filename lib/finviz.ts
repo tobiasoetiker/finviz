@@ -173,12 +173,34 @@ export const getIndustryPerformance = async (
                 ? `\`${config.gcp.projectId}.stock_data.processed_stock_data_industry_history\``
                 : `\`${config.gcp.projectId}.stock_data.processed_stock_data_sector_history\``;
 
+            const rawTable = `\`${config.gcp.projectId}.stock_data.processed_stock_data_history\``;
+            const snapshotWhere = snapshotId && snapshotId !== 'live' ? `snapshot_id = @snapshotId` : "is_current = 'yes'";
+            const sectorWhere = sectorFilter && groupBy === 'industry' ? `AND parent_sector = @sectorFilter` : '';
+            const groupCol = groupBy === 'industry' ? 'industry' : 'sector';
+
             query = `
-                SELECT * 
-                FROM ${table}
-                WHERE ${snapshotId && snapshotId !== 'live' ? `snapshot_id = @snapshotId` : "is_current = 'yes'"}
-                ${sectorFilter && groupBy === 'industry' ? `AND parent_sector = @sectorFilter` : ''}
-                ORDER BY momentum DESC
+                WITH agg AS (
+                    SELECT * FROM ${table}
+                    WHERE ${snapshotWhere} ${sectorWhere}
+                ),
+                raw_stocks AS (
+                    SELECT ${groupCol} as group_name, ticker,
+                        SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week
+                    FROM ${rawTable}
+                    WHERE ${snapshotId && snapshotId !== 'live' ? `CAST(processed_at AS STRING) = @snapshotId` : "is_current = 'yes'"}
+                    ${sectorFilter && groupBy === 'industry' ? `AND sector = @sectorFilter` : ''}
+                ),
+                top_drivers AS (
+                    SELECT group_name,
+                        ARRAY_AGG(STRUCT(ticker, pct_week as week) IGNORE NULLS ORDER BY pct_week DESC LIMIT 5) as topStocks
+                    FROM raw_stocks
+                    WHERE group_name IS NOT NULL
+                    GROUP BY group_name
+                )
+                SELECT agg.* EXCEPT(topStocks), td.topStocks
+                FROM agg
+                LEFT JOIN top_drivers td ON agg.name = td.group_name
+                ORDER BY agg.momentum DESC
             `;
         }
 
