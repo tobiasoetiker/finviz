@@ -253,13 +253,30 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
         params.rsiThreshold = rsiThreshold;
 
         const query = `
-        WITH RecentSnapshots AS (
-            -- Only fetch the last 25 snapshots (enough for 20-period SMA + buffer)
-            SELECT DISTINCT processed_at
+        WITH SnapshotPrices AS (
+            SELECT
+                processed_at,
+                MAX(CASE WHEN ticker = 'AAPL' THEN price END) as aapl_price
             FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
             ${snapshotId && snapshotId !== 'live'
                 ? `WHERE CAST(processed_at AS STRING) <= @snapshotId`
                 : ''}
+            GROUP BY processed_at
+            ORDER BY processed_at DESC
+            LIMIT 60
+        ),
+        TradingDays AS (
+            SELECT
+                processed_at,
+                aapl_price,
+                LAG(aapl_price) OVER (ORDER BY processed_at ASC) as prev_aapl_price
+            FROM SnapshotPrices
+        ),
+        RecentSnapshots AS (
+            -- Only fetch the last 25 *trading* snapshots (enough for 20-period SMA + buffer)
+            SELECT processed_at
+            FROM TradingDays
+            WHERE aapl_price != prev_aapl_price OR prev_aapl_price IS NULL
             ORDER BY processed_at DESC
             LIMIT 25
         ),
@@ -405,11 +422,28 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
         // Step 2: Find stocks that had Bollinger signals on the previous date and their current prices
         // Use market-cap-weighted average return of all stocks as market proxy (since SPY/ETFs aren't in the dataset)
         const backtestQuery = `
-        WITH RecentSnapshots AS (
-            -- Only fetch the last 25 snapshots up to previousDate (enough for 20-period SMA)
-            SELECT DISTINCT processed_at
+        WITH SnapshotPrices AS (
+            SELECT
+                processed_at,
+                MAX(CASE WHEN ticker = 'AAPL' THEN price END) as aapl_price
             FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
             WHERE CAST(processed_at AS STRING) <= @previousDate
+            GROUP BY processed_at
+            ORDER BY processed_at DESC
+            LIMIT 60
+        ),
+        TradingDays AS (
+            SELECT
+                processed_at,
+                aapl_price,
+                LAG(aapl_price) OVER (ORDER BY processed_at ASC) as prev_aapl_price
+            FROM SnapshotPrices
+        ),
+        RecentSnapshots AS (
+            -- Only fetch the last 25 *trading* snapshots up to previousDate (enough for 20-period SMA)
+            SELECT processed_at
+            FROM TradingDays
+            WHERE aapl_price != prev_aapl_price OR prev_aapl_price IS NULL
             ORDER BY processed_at DESC
             LIMIT 25
         ),
