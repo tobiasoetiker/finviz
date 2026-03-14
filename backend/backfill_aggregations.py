@@ -40,20 +40,21 @@ def backfill():
     query_industry = f"""
     CREATE OR REPLACE TABLE `{project_id}.stock_data.processed_stock_data_industry_history` AS
     WITH raw_data AS (
-        SELECT 
+        SELECT
             industry,
             sector,
             processed_at,
             is_current,
             SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
             SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+            SAFE_CAST(REPLACE(performance_quarter, '%', '') AS FLOAT64) as pct_quarter,
             SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
             SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
             SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap,
             ticker
         FROM `{project_id}.stock_data.processed_stock_data_history`
     )
-    SELECT 
+    SELECT
         CAST(processed_at AS STRING) as snapshot_id,
         MAX(processed_at) as processed_at,
         is_current,
@@ -63,15 +64,17 @@ def backfill():
         SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
         SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
         SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
+        SUM(pct_quarter * mcap) / NULLIF(SUM(mcap), 0) as quarter,
         SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
         (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
         -- Equal Weighted
         AVG(pct_change) as changeEqual,
         AVG(pct_week) as weekEqual,
         AVG(pct_month) as monthEqual,
+        AVG(pct_quarter) as quarterEqual,
         AVG(rsi) as rsiEqual,
         AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
-        
+
         SUM(mcap) as marketCap,
         COUNT(*) as stockCount,
 
@@ -92,19 +95,20 @@ def backfill():
     query_sector = f"""
     CREATE OR REPLACE TABLE `{project_id}.stock_data.processed_stock_data_sector_history` AS
     WITH raw_data AS (
-        SELECT 
+        SELECT
             sector,
             processed_at,
             is_current,
             SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
             SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+            SAFE_CAST(REPLACE(performance_quarter, '%', '') AS FLOAT64) as pct_quarter,
             SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
             SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
             SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap,
             ticker
         FROM `{project_id}.stock_data.processed_stock_data_history`
     )
-    SELECT 
+    SELECT
         CAST(processed_at AS STRING) as snapshot_id,
         MAX(processed_at) as processed_at,
         is_current,
@@ -114,15 +118,17 @@ def backfill():
         SUM(pct_change * mcap) / NULLIF(SUM(mcap), 0) as change,
         SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0) as week,
         SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0) as month,
+        SUM(pct_quarter * mcap) / NULLIF(SUM(mcap), 0) as quarter,
         SUM(rsi * mcap) / NULLIF(SUM(mcap), 0) as rsi,
         (SUM(pct_week * mcap) / NULLIF(SUM(mcap), 0)) - ((SUM(pct_month * mcap) / NULLIF(SUM(mcap), 0)) / 4) as momentum,
         -- Equal Weighted
         AVG(pct_change) as changeEqual,
         AVG(pct_week) as weekEqual,
         AVG(pct_month) as monthEqual,
+        AVG(pct_quarter) as quarterEqual,
         AVG(rsi) as rsiEqual,
         AVG(pct_week) - (AVG(pct_month) / 4) as momentumEqual,
-        
+
         SUM(mcap) as marketCap,
         COUNT(*) as stockCount,
 

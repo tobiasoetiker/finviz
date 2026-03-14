@@ -1,3 +1,6 @@
+export type PerformanceTimeFrame = 'change' | 'week' | 'month' | 'quarter';
+export type MomentumPreset = 'daily' | 'weekly' | 'monthly';
+
 export interface GroupPerformance {
   name: string;
   change: number; // Daily change
@@ -5,12 +8,14 @@ export interface GroupPerformance {
   // Market-Cap Weighted
   week: number;
   month: number;
+  quarter: number;
   momentum: number;
   rsi: number; // Market-Cap Weighted RSI
 
   // Equally Weighted
   weekEqual: number;
   monthEqual: number;
+  quarterEqual: number;
   momentumEqual: number;
   rsiEqual: number; // Equal Weighted RSI
 

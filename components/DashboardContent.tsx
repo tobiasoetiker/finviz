@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { IndustryApiResponse } from '@/types';
+import { IndustryApiResponse, PerformanceTimeFrame, MomentumPreset } from '@/types';
 import { refreshMarketData } from '@/lib/finviz';
 import PerformanceTable from './PerformanceTable';
 import MomentumMatrix from './MomentumMatrix';
@@ -20,6 +20,8 @@ interface Props {
 export default function DashboardContent({ data: { data, lastUpdated }, multiSnapshotData, snapshots, sectors = [], industries = [], yAxis: initialYAxis }: Props) {
     const [weighting, setWeighting] = useState<'weighted' | 'equal'>('weighted');
     const [momentumFocus, setMomentumFocus] = useState<'all' | 'top10_momentum' | 'top10_performance'>('all');
+    const [performanceTimeFrame, setPerformanceTimeFrame] = useState<PerformanceTimeFrame>('week');
+    const [momentumPreset, setMomentumPreset] = useState<MomentumPreset>('weekly');
     const [rsiRange, setRsiRange] = useState<[number, number]>([0, 100]);
     const [isRefreshing, startRefresh] = useTransition();
     const router = useRouter();
@@ -47,14 +49,45 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
         hour12: true
     }) : 'Never';
 
+    // Performance time frame labels for display
+    const perfLabel: Record<PerformanceTimeFrame, string> = {
+        change: 'Daily', week: '1 Week', month: '1 Month', quarter: '1 Quarter'
+    };
+    const momentumLabel: Record<MomentumPreset, string> = {
+        daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly'
+    };
+
     // Transform data based on selection
-    let displayData = data.map(item => ({
-        ...item,
-        week: weighting === 'equal' ? item.weekEqual : item.week,
-        month: weighting === 'equal' ? item.monthEqual : item.month,
-        momentum: weighting === 'equal' ? item.momentumEqual : item.momentum,
-        rsi: weighting === 'equal' ? item.rsiEqual : item.rsi
-    }));
+    let displayData = data.map(item => {
+        const w = weighting === 'equal';
+        const change = w ? item.change : item.change; // change has no equal variant in current data
+        const week = w ? item.weekEqual : item.week;
+        const month = w ? item.monthEqual : item.month;
+        const quarter = w ? item.quarterEqual : item.quarter;
+        const rsi = w ? item.rsiEqual : item.rsi;
+
+        // Compute momentum based on preset
+        let momentum: number;
+        switch (momentumPreset) {
+            case 'daily':  momentum = change - (week / 5); break;
+            case 'weekly': momentum = week - (month / 4); break;
+            case 'monthly': momentum = month - (quarter / 3); break;
+        }
+
+        // Map performanceTimeFrame to the correct value for the performance axis
+        const perfMap: Record<PerformanceTimeFrame, number> = { change, week, month, quarter };
+        const perfValue = perfMap[performanceTimeFrame];
+
+        return {
+            ...item,
+            change: item.change,
+            week: perfValue,
+            month: w ? item.monthEqual : item.month,
+            quarter: w ? item.quarterEqual : item.quarter,
+            momentum,
+            rsi,
+        };
+    });
 
     // Apply RSI Filtering
     displayData = displayData.filter(item => {
@@ -76,6 +109,10 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                 setWeighting={setWeighting}
                 momentumFocus={momentumFocus}
                 setMomentumFocus={setMomentumFocus}
+                performanceTimeFrame={performanceTimeFrame}
+                setPerformanceTimeFrame={setPerformanceTimeFrame}
+                momentumPreset={momentumPreset}
+                setMomentumPreset={setMomentumPreset}
                 currentSnapshot={currentSnapshot}
                 groupBy={groupBy}
                 currentSector={currentSector}
@@ -98,6 +135,9 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                     weighting={weighting}
                     groupBy={groupBy as 'industry' | 'sector' | 'ticker'}
                     yAxis={yAxis as 'week' | 'rsi'}
+                    performanceLabel={perfLabel[performanceTimeFrame]}
+                    momentumPreset={momentumPreset}
+                    momentumLabel={momentumLabel[momentumPreset]}
                 />
             </div>
 
@@ -110,6 +150,8 @@ export default function DashboardContent({ data: { data, lastUpdated }, multiSna
                     data={displayData}
                     title={groupBy === 'ticker' ? 'Stock Performance' : (groupBy === 'sector' ? 'Sector Performance' : 'Industry Performance')}
                     groupBy={groupBy as string}
+                    performanceLabel={perfLabel[performanceTimeFrame]}
+                    momentumLabel={momentumLabel[momentumPreset]}
                 />
             </div>
 

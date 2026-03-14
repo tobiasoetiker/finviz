@@ -9,11 +9,13 @@ interface Props {
     data: GroupPerformance[];
     title?: string;
     groupBy?: string;
+    performanceLabel?: string;
+    momentumLabel?: string;
 }
 
 type SortKey = 'name' | 'change' | 'week' | 'month' | 'momentum' | 'marketCap';
 
-export default function PerformanceTable({ data, title = 'Industry Performance', groupBy = 'industry' }: Props) {
+export default function PerformanceTable({ data, title = 'Industry Performance', groupBy = 'industry', performanceLabel = '1 Week', momentumLabel = 'Weekly' }: Props) {
     const [sortKey, setSortKey] = useState<SortKey>('momentum');
     const [sortDesc, setSortDesc] = useState(true);
     const [filter, setFilter] = useState('');
@@ -94,13 +96,13 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                                 <div className="flex items-center justify-end space-x-1"><span>Daily</span> <SortIcon column="change" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell" onClick={() => handleSort('week')}>
-                                <div className="flex items-center justify-end space-x-1"><span>1 Week</span> <SortIcon column="week" /></div>
+                                <div className="flex items-center justify-end space-x-1"><span>{performanceLabel}</span> <SortIcon column="week" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden lg:table-cell" onClick={() => handleSort('month')}>
                                 <div className="flex items-center justify-end space-x-1"><span>1 Month</span> <SortIcon column="month" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('momentum')}>
-                                <div className="flex items-center justify-end space-x-1"><span>Momentum</span> <SortIcon column="momentum" /></div>
+                                <div className="flex items-center justify-end space-x-1"><span>Momentum ({momentumLabel})</span> <SortIcon column="momentum" /></div>
                             </th>
                             <th className="px-6 py-4 text-left hidden xl:table-cell">
                                 <div className="flex items-center space-x-1"><span>Top Drivers</span></div>

@@ -9,9 +9,9 @@ import { queryBigQuery } from './bigquery';
 interface BigQueryIndustryRow {
     name?: string; industry?: string; sector?: string; ticker?: string;
     processed_at: string | { value: string };
-    change?: number; week?: number; month?: number; rsi?: number; momentum?: number;
-    changeequal?: number; weekequal?: number; monthequal?: number; rsiequal?: number; momentumequal?: number;
-    changeEqual?: number; weekEqual?: number; monthEqual?: number; rsiEqual?: number; momentumEqual?: number;
+    change?: number; week?: number; month?: number; quarter?: number; rsi?: number; momentum?: number;
+    changeequal?: number; weekequal?: number; monthequal?: number; quarterequal?: number; rsiequal?: number; momentumequal?: number;
+    changeEqual?: number; weekEqual?: number; monthEqual?: number; quarterEqual?: number; rsiEqual?: number; momentumEqual?: number;
     marketcap?: number; stockcount?: number; topstocks?: { ticker: string; week: number }[];
     marketCap?: number; stockCount?: number; topStocks?: { ticker: string; week: number }[];
 }
@@ -147,10 +147,11 @@ export const getIndustryPerformance = async (
                 WHERE ${snapshotId && snapshotId !== 'live' ? `CAST(processed_at AS STRING) = @snapshotId` : "is_current = 'yes'"}
             ),
             clean_data AS (
-                SELECT 
+                SELECT
                     industry, sector, ticker, processed_at,
                     SAFE_CAST(REPLACE(performance_week, '%', '') AS FLOAT64) as pct_week,
                     SAFE_CAST(REPLACE(performance_month, '%', '') AS FLOAT64) as pct_month,
+                    SAFE_CAST(REPLACE(performance_quarter, '%', '') AS FLOAT64) as pct_quarter,
                     SAFE_CAST(REPLACE(change, '%', '') AS FLOAT64) as pct_change,
                     SAFE_CAST(relative_strength_index_14 AS FLOAT64) as rsi,
                     SAFE_CAST(market_cap AS FLOAT64) * 1000000 as mcap
@@ -159,15 +160,15 @@ export const getIndustryPerformance = async (
                 ${sectorFilter ? `AND sector = @sectorFilter` : ''}
                 ${industryFilter ? `AND industry = @industryFilter` : ''}
             )
-            SELECT 
+            SELECT
                 ticker as name, sector, industry,
-                pct_change as change, pct_week as week, pct_month as month, rsi,
+                pct_change as change, pct_week as week, pct_month as month, pct_quarter as quarter, rsi,
                 pct_week - (pct_month / 4) as momentum,
-                pct_change as changeEqual, pct_week as weekEqual, pct_month as monthEqual, rsi as rsiEqual,
+                pct_change as changeEqual, pct_week as weekEqual, pct_month as monthEqual, pct_quarter as quarterEqual, rsi as rsiEqual,
                 pct_week - (pct_month / 4) as momentumEqual,
                 SUM(mcap) as marketCap, 1 as stockCount, processed_at, CAST(NULL AS ARRAY<STRUCT<ticker STRING, week FLOAT64>>) as topStocks
             FROM clean_data
-            GROUP BY name, sector, industry, change, week, month, rsi, momentum, changeEqual, weekEqual, monthEqual, rsiEqual, momentumEqual, processed_at
+            GROUP BY name, sector, industry, change, week, month, quarter, rsi, momentum, changeEqual, weekEqual, monthEqual, quarterEqual, rsiEqual, momentumEqual, processed_at
             ORDER BY momentum DESC
             `;
         } else {
@@ -222,11 +223,13 @@ export const getIndustryPerformance = async (
             change: row.change ?? 0,
             week: row.week ?? 0,
             month: row.month ?? 0,
+            quarter: row.quarter ?? (row as any).quarterequal ?? 0,
             rsi: row.rsi ?? 0,
             momentum: row.momentum ?? 0,
             changeEqual: row.changeEqual ?? row.changeequal ?? 0,
             weekEqual: row.weekEqual ?? row.weekequal ?? 0,
             monthEqual: row.monthEqual ?? row.monthequal ?? 0,
+            quarterEqual: row.quarterEqual ?? row.quarterequal ?? 0,
             rsiEqual: row.rsiEqual ?? row.rsiequal ?? 0,
             momentumEqual: row.momentumEqual ?? row.momentumequal ?? 0,
             volume: 0,

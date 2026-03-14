@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Scale, LayoutGrid, Briefcase, PieChart, Filter, BarChart2, ChevronDown, History, Clock, Check, LineChart } from 'lucide-react';
+import { Scale, LayoutGrid, Briefcase, PieChart, Filter, BarChart2, ChevronDown, History, Clock, Check, LineChart, Zap, TrendingUp, CalendarDays } from 'lucide-react';
+import { PerformanceTimeFrame, MomentumPreset } from '@/types';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 interface Props {
@@ -9,6 +10,10 @@ interface Props {
     setWeighting: (w: 'weighted' | 'equal') => void;
     momentumFocus: 'all' | 'top10_momentum' | 'top10_performance';
     setMomentumFocus: (s: 'all' | 'top10_momentum' | 'top10_performance') => void;
+    performanceTimeFrame: PerformanceTimeFrame;
+    setPerformanceTimeFrame: (p: PerformanceTimeFrame) => void;
+    momentumPreset: MomentumPreset;
+    setMomentumPreset: (m: MomentumPreset) => void;
     currentSnapshot: string;
     groupBy: string;
     currentSector: string;
@@ -65,6 +70,10 @@ export default function ControlBar({
     setWeighting,
     momentumFocus,
     setMomentumFocus,
+    performanceTimeFrame,
+    setPerformanceTimeFrame,
+    momentumPreset,
+    setMomentumPreset,
     currentSnapshot,
     groupBy,
     currentSector,
@@ -183,6 +192,39 @@ export default function ControlBar({
                                     options={[
                                         { value: 'week', label: 'Performance', icon: <BarChart2 size={14} /> },
                                         { value: 'rsi', label: 'RSI (14)', icon: <span className="font-black text-[10px]">RSI</span> }
+                                    ]}
+                                />
+                            </ControlGroup>
+
+                            <ControlGroup label="Performance Time Frame">
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                        <CalendarDays size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
+                                    <select
+                                        value={performanceTimeFrame}
+                                        onChange={(e) => setPerformanceTimeFrame(e.target.value as PerformanceTimeFrame)}
+                                        className="pl-9 pr-10 py-0 h-[42px] bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-all outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 min-w-[160px]"
+                                    >
+                                        <option value="change">Daily</option>
+                                        <option value="week">1 Week</option>
+                                        <option value="month">1 Month</option>
+                                        <option value="quarter">1 Quarter</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                        <ChevronDown size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                    </div>
+                                </div>
+                            </ControlGroup>
+
+                            <ControlGroup label="Momentum Preset">
+                                <SegmentedControl
+                                    value={momentumPreset}
+                                    onChange={(val) => setMomentumPreset(val as MomentumPreset)}
+                                    options={[
+                                        { value: 'daily', label: 'Daily', icon: <Zap size={14} /> },
+                                        { value: 'weekly', label: 'Weekly', icon: <TrendingUp size={14} /> },
+                                        { value: 'monthly', label: 'Monthly', icon: <CalendarDays size={14} /> },
                                     ]}
                                 />
                             </ControlGroup>

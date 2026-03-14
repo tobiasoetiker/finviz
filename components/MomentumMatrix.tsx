@@ -6,15 +6,20 @@ import { IndustryRow, IndustryApiResponse } from '@/types';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Label, ReferenceArea, LabelList, Cell } from 'recharts';
 import { formatPercent, formatMoney, formatCompactNumber } from '@/lib/formatters';
 
+import { MomentumPreset } from '@/types';
+
 interface Props {
   data: IndustryRow[];
   multiSnapshotData?: Record<string, IndustryApiResponse>;
   weighting: 'weighted' | 'equal';
   groupBy: 'industry' | 'sector' | 'ticker';
   yAxis?: 'week' | 'rsi';
+  performanceLabel?: string;
+  momentumPreset?: MomentumPreset;
+  momentumLabel?: string;
 }
 
-const CustomTooltip = ({ active, payload, yAxis_ }: any) => {
+const CustomTooltip = ({ active, payload, yAxis_, perfLabel, momLabel }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const isRSI = yAxis_ === 'rsi';
@@ -23,13 +28,13 @@ const CustomTooltip = ({ active, payload, yAxis_ }: any) => {
         <p className="font-bold text-sm mb-2 text-gray-800">{data.name}</p>
         <div className="space-y-1.5">
           <p className="text-gray-500 flex justify-between gap-4">
-            <span>Momentum:</span>
+            <span>Momentum ({momLabel || 'Weekly'}):</span>
             <span className={`font-mono font-bold ${data.momentum >= 0 ? 'text-green-600' : 'text-red-500'}`}>
               {formatPercent(data.momentum)}
             </span>
           </p>
           <p className="text-gray-500 flex justify-between gap-4">
-            <span>{isRSI ? 'RSI:' : 'Weekly Perf:'}</span>
+            <span>{isRSI ? 'RSI:' : `${perfLabel || '1 Week'} Perf:`}</span>
             <span className={`font-mono font-bold ${data[isRSI ? 'rsi' : 'week'] >= (isRSI ? 50 : 0) ? 'text-blue-600' : 'text-gray-600'}`}>
               {isRSI ? data.rsi.toFixed(2) : formatPercent(data.week)}
             </span>
@@ -50,7 +55,7 @@ const CustomTooltip = ({ active, payload, yAxis_ }: any) => {
   return null;
 };
 
-export default function MomentumMatrix({ data, multiSnapshotData, weighting, groupBy = 'industry', yAxis = 'week' }: Props) {
+export default function MomentumMatrix({ data, multiSnapshotData, weighting, groupBy = 'industry', yAxis = 'week', performanceLabel = '1 Week', momentumPreset: mPreset = 'weekly', momentumLabel = 'Weekly' }: Props) {
   // --- Zoom & Pan State ---
   const [zoomLevel, setZoomLevel] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // offset in domain units
@@ -92,14 +97,27 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
     snapshotIds.forEach((id, snapshotIndex) => {
       const snapshot = multiSnapshotData[id];
       snapshot.data.forEach(item => {
+        const w = weighting === 'equal';
+        const change = item.change;
+        const week = w ? item.weekEqual : item.week;
+        const month = w ? item.monthEqual : item.month;
+        const quarter = w ? item.quarterEqual : item.quarter;
+
+        // Compute momentum based on preset
+        let momentum: number;
+        switch (mPreset) {
+            case 'daily':  momentum = change - (week / 5); break;
+            case 'weekly': momentum = week - (month / 4); break;
+            case 'monthly': momentum = month - (quarter / 3); break;
+        }
+
         const itemData = {
           name: item.name,
-          momentum: weighting === 'equal' ? item.momentumEqual : item.momentum,
-          yValue: weighting === 'equal' ? (isRSI ? (item as any).rsiEqual : item.weekEqual) : (isRSI ? (item as any).rsi : item.week),
+          momentum,
+          yValue: w ? (isRSI ? (item as any).rsiEqual : item.weekEqual) : (isRSI ? (item as any).rsi : item.week),
           snapshotIndex,
-          // Extra payload data to prevent Tooltip crashing on historical points
-          week: weighting === 'equal' ? item.weekEqual : item.week,
-          rsi: weighting === 'equal' ? (item as any).rsiEqual : (item as any).rsi,
+          week: w ? item.weekEqual : item.week,
+          rsi: w ? (item as any).rsiEqual : (item as any).rsi,
           marketCap: item.marketCap,
           stockCount: item.stockCount,
           isHistorical: snapshotIndex < snapshotIds.length - 1,
@@ -116,18 +134,16 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
     const activeNames = new Set(chartData.map(d => d.name));
     return Array.from(trajectoryMap.values())
       .filter(t => t.length > 1 && activeNames.has(t[0].name));
-  }, [multiSnapshotData, weighting, isRSI, chartData]);
+  }, [multiSnapshotData, weighting, isRSI, chartData, mPreset]);
 
   // Calculate dynamic domain
   const allMomentumValues = chartData.map(d => Math.abs(d.momentum));
-  if (multiSnapshotData) {
-    Object.values(multiSnapshotData).forEach(s => {
-      s.data.forEach(d => {
-        const val = weighting === 'equal' ? d.momentumEqual : d.momentum;
-        if (val !== null) allMomentumValues.push(Math.abs(val));
-      });
+  // Include trajectory momentum values in domain calculation
+  trajectories.forEach(traj => {
+    traj.forEach((point: any) => {
+      if (point.momentum !== null) allMomentumValues.push(Math.abs(point.momentum));
     });
-  }
+  });
   const maxAbsMomentum = Math.max(...allMomentumValues, 5);
   const xBound = maxAbsMomentum * 1.5;
 
@@ -327,7 +343,7 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
     <div className="w-full card p-6">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold text-black flex items-center gap-2">
-          {groupBy === 'sector' ? 'Sector' : (groupBy === 'industry' ? 'Industry' : 'Stock')} Momentum vs {isRSI ? 'RSI' : 'Performance'}
+          {groupBy === 'sector' ? 'Sector' : (groupBy === 'industry' ? 'Industry' : 'Stock')} Momentum ({momentumLabel}) vs {isRSI ? 'RSI' : `${performanceLabel} Performance`}
           <span className="text-[11px] font-normal text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wider">All {groupBy === 'sector' ? 'Sectors' : (groupBy === 'industry' ? 'Industries' : 'Stocks')}</span>
         </h3>
         <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500 uppercase tracking-tight">
@@ -422,10 +438,10 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
               allowDataOverflow={true}
               tickFormatter={(value) => value.toFixed(1)}
             >
-              <Label value={isRSI ? 'RSI (14)' : 'Weekly Performance'} angle={-90} position="insideLeft" style={{ fill: '#64748b', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
+              <Label value={isRSI ? 'RSI (14)' : `${performanceLabel} Performance`} angle={-90} position="insideLeft" style={{ fill: '#64748b', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
             </YAxis>
 
-            <Tooltip content={<CustomTooltip yAxis_={yAxis} />} cursor={{ strokeDasharray: '3 3', stroke: '#cbd5e1' }} />
+            <Tooltip content={<CustomTooltip yAxis_={yAxis} perfLabel={performanceLabel} momLabel={momentumLabel} />} cursor={{ strokeDasharray: '3 3', stroke: '#cbd5e1' }} />
 
             {/* Quadrant Backgrounds & Labels (only show if not zoomed in excessively to avoid clutter) */}
             {zoomLevel < 3 && (
