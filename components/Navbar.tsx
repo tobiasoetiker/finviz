@@ -29,6 +29,14 @@ export default function Navbar() {
                     >
                         Signals
                     </Link>
+                    <Link
+                        href="/backtest"
+                        className={`text-[11px] font-black uppercase tracking-widest transition-colors ${
+                            pathname === '/backtest' ? 'text-black' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Backtest
+                    </Link>
                     <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Finviz Elite Data Engine</span>
                 </div>
             </div>
