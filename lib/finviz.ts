@@ -11,7 +11,9 @@ interface BigQueryIndustryRow {
     processed_at: string | { value: string };
     change?: number; week?: number; month?: number; rsi?: number; momentum?: number;
     changeequal?: number; weekequal?: number; monthequal?: number; rsiequal?: number; momentumequal?: number;
+    changeEqual?: number; weekEqual?: number; monthEqual?: number; rsiEqual?: number; momentumEqual?: number;
     marketcap?: number; stockcount?: number; topstocks?: { ticker: string; week: number }[];
+    marketCap?: number; stockCount?: number; topStocks?: { ticker: string; week: number }[];
 }
 
 interface BigQueryBollingerRow {
@@ -222,15 +224,15 @@ export const getIndustryPerformance = async (
             month: row.month ?? 0,
             rsi: row.rsi ?? 0,
             momentum: row.momentum ?? 0,
-            changeEqual: row.changeequal ?? 0,
-            weekEqual: row.weekequal ?? 0,
-            monthEqual: row.monthequal ?? 0,
-            rsiEqual: row.rsiequal ?? 0,
-            momentumEqual: row.momentumequal ?? 0,
+            changeEqual: row.changeEqual ?? row.changeequal ?? 0,
+            weekEqual: row.weekEqual ?? row.weekequal ?? 0,
+            monthEqual: row.monthEqual ?? row.monthequal ?? 0,
+            rsiEqual: row.rsiEqual ?? row.rsiequal ?? 0,
+            momentumEqual: row.momentumEqual ?? row.momentumequal ?? 0,
             volume: 0,
-            marketCap: row.marketcap ?? 0,
-            stockCount: row.stockcount ?? 0,
-            topStocks: row.topstocks ?? [],
+            marketCap: row.marketCap ?? row.marketcap ?? 0,
+            stockCount: row.stockCount ?? row.stockcount ?? 0,
+            topStocks: row.topStocks ?? row.topstocks ?? [],
         }));
 
         return {
