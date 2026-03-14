@@ -122,7 +122,7 @@ export default function ControlBar({
     const selectedSnapshots = currentSnapshot.split(',');
 
     return (
-        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] w-full py-3 md:py-4 px-4 md:px-12">
+        <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] w-full py-3 md:py-4 px-4 md:px-12">
             <div className="max-w-[1600px] mx-auto flex flex-col gap-4 md:gap-5">
 
                 {/* Mobile Toggle & Summary Row */}

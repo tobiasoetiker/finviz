@@ -60,7 +60,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
     };
 
     return (
-        <div className="modern-card p-0 overflow-hidden">
+        <div className="card p-0 overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center bg-white/50 backdrop-blur-sm">
                 <h3 className="text-lg font-bold text-slate-800 mb-4 sm:mb-0 flex items-center">
                     <Filter size={18} className="mr-2 text-slate-400" />

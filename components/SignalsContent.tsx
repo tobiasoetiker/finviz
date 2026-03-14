@@ -39,7 +39,7 @@ export default function SignalsContent({ snapshots, bollingerSignals, bollingerR
 
     return (
         <div className="space-y-16">
-            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-100 py-4">
+            <div className="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm border-b border-slate-100 py-4">
                 <div className="flex items-center gap-4 flex-wrap">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Snapshot</label>
                     <select

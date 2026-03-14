@@ -49,7 +49,7 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
 
     const HeaderCell = ({ label, sortKey, alignRight = false, hiddenClass = '' }: { label: string; sortKey: SortKey; alignRight?: boolean; hiddenClass?: string }) => (
         <th
-            className={`py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors ${alignRight ? 'text-right' : ''} ${hiddenClass}`}
+            className={`py-2.5 px-4 font-semibold text-slate-500 uppercase text-xs tracking-wider whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors ${alignRight ? 'text-right' : ''} ${hiddenClass}`}
             onClick={() => requestSort(sortKey)}
         >
             <div className={`flex items-center ${alignRight ? 'justify-end' : ''}`}>
@@ -120,27 +120,27 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
         <div className="space-y-4">
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
                     <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Signals</div>
                     <div className="text-lg font-bold text-slate-900">{data.length}</div>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
                     <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Win Rate</div>
                     <div className={`text-lg font-bold ${winnersCount / data.length >= 0.5 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {((winnersCount / data.length) * 100).toFixed(0)}%
                     </div>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
                     <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Avg Return</div>
                     <div className={`text-lg font-bold ${pctColor(avgReturn)}`}>{formatPct(avgReturn)}</div>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
                     <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">vs Market</div>
                     <div className={`text-lg font-bold ${pctColor(avgExcess)}`}>{formatPct(avgExcess)}</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">Mkt: {formatPct(spyReturn)}</div>
                 </div>
                 {rsiReturnCorr !== null && (
-                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
                         <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">RSI Edge</div>
                         <div className={`text-lg font-bold ${rsiReturnCorr < -0.1 ? 'text-emerald-600' : rsiReturnCorr > 0.1 ? 'text-amber-600' : 'text-slate-500'}`}>
                             {rsiReturnCorr.toFixed(2)}
@@ -151,7 +151,7 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
                     </div>
                 )}
                 {mcapReturnCorr !== null && (
-                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
                         <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Cap Edge</div>
                         <div className={`text-lg font-bold ${mcapReturnCorr < -0.1 ? 'text-emerald-600' : mcapReturnCorr > 0.1 ? 'text-amber-600' : 'text-slate-500'}`}>
                             {mcapReturnCorr.toFixed(2)}
@@ -164,7 +164,7 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+            <div className="overflow-x-auto card">
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">

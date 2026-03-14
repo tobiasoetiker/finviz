@@ -23,7 +23,7 @@ export default function RootLayout({
         <main className="flex-grow pv-container py-6">
           {children}
         </main>
-        <footer className="bg-white border-t border-gray-200 mt-auto py-8">
+        <footer className="bg-white/80 backdrop-blur-sm mt-auto py-8">
           <div className="pv-container text-center text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
             &copy; {new Date().getFullYear()} Sector Performance / Momentum Analyzer <br />
             Data provided by Finviz Elite

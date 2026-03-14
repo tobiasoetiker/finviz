@@ -3,6 +3,7 @@
 @theme {
   --color-pv-blue: #3D3DFF;
   --color-pv-mint: #7CFFC4;
+  --color-surface: #F7F8FB;
 }
 
 :root {
@@ -12,7 +13,11 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: white;
+  background: var(--color-surface);
+}
+
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-slate-200/60;
 }
 
 .pv-container {

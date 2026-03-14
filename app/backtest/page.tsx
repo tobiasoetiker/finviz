@@ -20,7 +20,7 @@ export default async function BacktestPage({ searchParams }: PageProps) {
   });
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen">
       <BacktestContent
         snapshots={snapshots}
         bollingerRsiThreshold={bollingerRsiThreshold}

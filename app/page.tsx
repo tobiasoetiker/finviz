@@ -26,7 +26,7 @@ export default async function Home({ searchParams }: PageProps) {
   });
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen">
       <DashboardContent
         data={multiData[multiData.length - 1]}
         multiSnapshotData={multiSnapshotData}

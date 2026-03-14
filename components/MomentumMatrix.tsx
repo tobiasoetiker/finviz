@@ -324,7 +324,7 @@ export default function MomentumMatrix({ data, multiSnapshotData, weighting, gro
   };
 
   return (
-    <div className="w-full bg-white border border-gray-50 rounded-2xl p-6 shadow-sm">
+    <div className="w-full card p-6">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold text-black flex items-center gap-2">
           {groupBy === 'sector' ? 'Sector' : (groupBy === 'industry' ? 'Industry' : 'Stock')} Momentum vs {isRSI ? 'RSI' : 'Performance'}

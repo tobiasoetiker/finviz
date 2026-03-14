@@ -34,7 +34,7 @@ export default function MarketMonitor({ data, groupBy = 'industry' }: Props) {
     };
 
     return (
-        <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full">
+        <div className="card p-8 w-full">
             <div className="flex justify-between items-center mb-10">
                 <div className="flex items-center gap-3">
                     <div className="pulsing-live"></div>
@@ -51,17 +51,17 @@ export default function MarketMonitor({ data, groupBy = 'industry' }: Props) {
             <div className="w-full">
                 <table className="w-full text-left">
                     <thead>
-                        <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                        <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
                             <th className="pb-4">{groupBy === 'sector' ? 'Sector' : 'Industry'}</th>
                             <th className="pb-4 text-center">Week</th>
                             <th className="pb-4 text-center">Month</th>
                             <th className="pb-4 text-center">Momentum</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-slate-100">
                         {top10.map((item) => (
-                            <tr key={item.name} className="group hover:bg-gray-50 transition-colors">
-                                <td className="py-4 text-[13px] font-medium text-[#444] border-r border-gray-50 pr-4">
+                            <tr key={item.name} className="group hover:bg-slate-50/80 transition-colors">
+                                <td className="py-4 text-[13px] font-medium text-[#444] border-r border-slate-100 pr-4">
                                     <span className="cursor-pointer hover:underline decoration-pv-blue decoration-2 underline-offset-4">
                                         {item.name}
                                     </span>
@@ -69,7 +69,7 @@ export default function MarketMonitor({ data, groupBy = 'industry' }: Props) {
                                 <td className="py-4 text-center px-4">
                                     {formatPill(item.week)}
                                 </td>
-                                <td className="py-4 text-center px-4 border-l border-r border-gray-50">
+                                <td className="py-4 text-center px-4 border-l border-r border-slate-100">
                                     {formatPill(item.month)}
                                 </td>
                                 <td className="py-4 text-center px-4">

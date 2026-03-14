@@ -57,7 +57,7 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
 
     const HeaderCell = ({ label, sortKey, alignRight = false, hiddenClass = '' }: { label: string, sortKey: SortKey, alignRight?: boolean, hiddenClass?: string }) => (
         <th
-            className={`py-2.5 px-4 font-semibold text-slate-800 text-xs tracking-wider whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors ${alignRight ? 'text-right' : ''} ${hiddenClass}`}
+            className={`py-2.5 px-4 font-semibold text-slate-500 uppercase text-xs tracking-wider whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors ${alignRight ? 'text-right' : ''} ${hiddenClass}`}
             onClick={() => requestSort(sortKey)}
         >
             <div className={`flex items-center ${alignRight ? 'justify-end' : ''}`}>
@@ -76,7 +76,7 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
     }
 
     return (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+        <div className="overflow-x-auto card">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
