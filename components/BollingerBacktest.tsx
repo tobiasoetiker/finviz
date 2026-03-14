@@ -5,6 +5,13 @@ import { useState, useMemo } from 'react';
 
 type SortKey = keyof BollingerBacktestRow;
 
+const formatMarketCap = (value: number) => {
+    if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+    if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+    return value.toLocaleString();
+};
+
 export default function BollingerBacktest({ data, signalDate, currentDate }: { data: BollingerBacktestRow[]; signalDate: string; currentDate: string }) {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'returnPct', direction: 'desc' });
 
@@ -148,6 +155,7 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
                             <HeaderCell label="Current RSI" sortKey="currentRsi" alignRight />
                             <HeaderCell label="Entry Price" sortKey="signalPrice" alignRight hiddenClass="hidden sm:table-cell" />
                             <HeaderCell label="Current Price" sortKey="currentPrice" alignRight />
+                            <HeaderCell label="Market Cap" sortKey="marketCap" alignRight hiddenClass="hidden md:table-cell" />
                             <HeaderCell label="Return" sortKey="returnPct" alignRight />
                             <HeaderCell label="vs Mkt" sortKey="excessReturnPct" alignRight />
                         </tr>
@@ -190,6 +198,9 @@ export default function BollingerBacktest({ data, signalDate, currentDate }: { d
                                 </td>
                                 <td className="py-3 px-4 font-bold text-slate-900 tabular-nums text-xs text-right">
                                     ${row.currentPrice.toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 font-medium hidden md:table-cell">
+                                    {formatMarketCap(row.marketCap)}
                                 </td>
                                 <td className="py-3 px-4 text-right">
                                     <span className={`font-bold tabular-nums px-2 py-0.5 rounded text-xs ${pctBg(row.returnPct)} ${pctColor(row.returnPct)}`}>

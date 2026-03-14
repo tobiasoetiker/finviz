@@ -516,7 +516,8 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
             c.currentPrice, c.currentRsi,
             (c.currentPrice - s.signalPrice) / s.signalPrice * 100 as returnPct,
             COALESCE(m.marketReturn, 0) as spyReturnPct,
-            (c.currentPrice - s.signalPrice) / s.signalPrice * 100 - COALESCE(m.marketReturn, 0) as excessReturnPct
+            (c.currentPrice - s.signalPrice) / s.signalPrice * 100 - COALESCE(m.marketReturn, 0) as excessReturnPct,
+            c.market_cap_val as marketCap
         FROM PrevSignals s
         JOIN CurrentSnapshot c ON s.ticker = c.ticker
         CROSS JOIN MarketReturn m
@@ -546,7 +547,8 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
             returnPct: row.returnPct || 0,
             spyReturnPct: row.spyReturnPct || 0,
             excessReturnPct: row.excessReturnPct || 0,
-            signalDate: previousDate
+            signalDate: previousDate,
+            marketCap: row.marketCap || 0
         }));
 
         return { rows, signalDate: previousDate, currentDate };

@@ -105,4 +105,5 @@ export interface BollingerBacktestRow {
   spyReturnPct: number;
   excessReturnPct: number;
   signalDate: string;
+  marketCap: number;
 }
