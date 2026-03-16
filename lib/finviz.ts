@@ -322,7 +322,7 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
         ),
         FilteredSignals AS (
             SELECT * FROM Signals
-            WHERE ${snapshotId && snapshotId !== 'live' ? 'CAST(processed_at AS STRING) = @snapshotId' : "is_current = 'yes'"}
+            WHERE processed_at = (SELECT MAX(processed_at) FROM RecentSnapshots)
               AND rsi < @rsiThreshold
               AND (price < lowerBand OR price > upperBand)
         )
