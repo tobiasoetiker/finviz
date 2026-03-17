@@ -12,7 +12,7 @@ const formatMarketCap = (value: number) => {
 
 type SortKey = keyof BollingerSignalRow | 'distanceFromBand';
 
-export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: BollingerSignalRow[]; rsiThreshold?: number }) {
+export default function BollingerSignals({ data, rsiThreshold = 30, showSignalDate = false }: { data: BollingerSignalRow[]; rsiThreshold?: number; showSignalDate?: boolean }) {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
 
     const sortedData = useMemo(() => {
@@ -83,6 +83,7 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
                         <HeaderCell label="Ticker" sortKey="ticker" />
                         <HeaderCell label="Company" sortKey="company" />
                         <HeaderCell label="Sector" sortKey="sector" hiddenClass="hidden sm:table-cell" />
+                        {showSignalDate && <HeaderCell label="Signal" sortKey="processedAt" />}
                         <HeaderCell label="Price" sortKey="price" alignRight />
                         <HeaderCell label="RSI" sortKey="rsi" alignRight />
                         <HeaderCell label="Market Cap" sortKey="marketCap" alignRight hiddenClass="hidden md:table-cell" />
@@ -108,6 +109,11 @@ export default function BollingerSignals({ data, rsiThreshold = 30 }: { data: Bo
                                     {row.sector}
                                 </span>
                             </td>
+                            {showSignalDate && (
+                                <td className="py-3 px-4 text-xs text-slate-500 font-medium whitespace-nowrap">
+                                    {row.signalDate}
+                                </td>
+                            )}
                             <td className="py-3 px-4 font-bold text-slate-900 tabular-nums text-xs text-right">
                                 ${row.price.toFixed(2)}
                             </td>

@@ -9,9 +9,10 @@ interface Props {
     snapshots: { id: string; label: string; timestamp: number }[];
     bollingerSignals: BollingerSignalRow[];
     bollingerRsiThreshold: number;
+    lookbackDays: number;
 }
 
-export default function SignalsContent({ snapshots, bollingerSignals, bollingerRsiThreshold }: Props) {
+export default function SignalsContent({ snapshots, bollingerSignals, bollingerRsiThreshold, lookbackDays }: Props) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentSnapshot = searchParams.get('snapshot') || (snapshots.length > 0 ? snapshots[0].id : '');
@@ -90,10 +91,19 @@ export default function SignalsContent({ snapshots, bollingerSignals, bollingerR
                             }}
                             className="w-16 text-center border border-slate-300 rounded-md px-2 py-0.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400"
                         />
-                        <p className="text-slate-500 text-sm">and price outside the 20-period 2-SD Bollinger Bands.</p>
+                        <p className="text-slate-500 text-sm">and price outside Bollinger Bands in the last</p>
+                        <select
+                            value={lookbackDays}
+                            onChange={(e) => updateParam('lookbackDays', e.target.value)}
+                            className="text-sm font-semibold text-slate-800 border border-slate-300 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400"
+                        >
+                            {[1, 2, 3, 5, 10].map((d) => (
+                                <option key={d} value={d}>{d} {d === 1 ? 'day' : 'days'}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
-                <BollingerSignals data={filteredSignals} rsiThreshold={bollingerRsiThreshold} />
+                <BollingerSignals data={filteredSignals} rsiThreshold={bollingerRsiThreshold} showSignalDate={lookbackDays > 1} />
             </div>
         </div>
     );

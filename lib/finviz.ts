@@ -249,13 +249,14 @@ export const getIndustryPerformance = async (
     }
 };
 
-export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThreshold: number = 30): Promise<BollingerSignalRow[]> => {
+export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThreshold: number = 30, lookbackDays: number = 1): Promise<BollingerSignalRow[]> => {
     try {
-        console.log(`Fetching Bollinger signals from BigQuery... snapshotId: ${snapshotId || 'live'}`);
+        console.log(`Fetching Bollinger signals from BigQuery... snapshotId: ${snapshotId || 'live'}, lookback: ${lookbackDays}d`);
 
         const params: Record<string, string | number> = {};
         if (snapshotId && snapshotId !== 'live') params.snapshotId = snapshotId;
         params.rsiThreshold = rsiThreshold;
+        params.lookbackDays = lookbackDays;
 
         const query = `
         WITH SnapshotPrices AS (
@@ -285,6 +286,13 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
             ORDER BY processed_at DESC
             LIMIT 25
         ),
+        LookbackSnapshots AS (
+            -- The trading days within the lookback window
+            SELECT processed_at
+            FROM RecentSnapshots
+            ORDER BY processed_at DESC
+            LIMIT @lookbackDays
+        ),
         HistoricalPrices AS (
             SELECT
                 h.ticker, h.company, h.sector, h.industry, h.processed_at, h.is_current, h.relative_strength_index_14 as rsi,
@@ -310,9 +318,9 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
             FROM HistoricalPrices
         ),
         Signals AS (
-            SELECT 
+            SELECT
                 ticker, company, sector, industry, price_val as price, rsi, market_cap_val as marketCap,
-                sma20, stddev20, 
+                sma20, stddev20,
                 (sma20 - 2 * stddev20) as lowerBand,
                 (sma20 + 2 * stddev20) as upperBand,
                 processed_at,
@@ -321,19 +329,25 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
             WHERE stddev20 IS NOT NULL
         ),
         FilteredSignals AS (
-            SELECT * FROM Signals
-            WHERE processed_at = (SELECT MAX(processed_at) FROM RecentSnapshots)
+            SELECT *,
+                CASE WHEN price < lowerBand THEN 'lower' ELSE 'upper' END as bandSide,
+                CASE
+                    WHEN price < lowerBand THEN ((lowerBand - price) / lowerBand) * 100
+                    ELSE ((price - upperBand) / upperBand) * 100
+                END as distanceFromBand
+            FROM Signals
+            WHERE processed_at IN (SELECT processed_at FROM LookbackSnapshots)
               AND rsi < @rsiThreshold
               AND (price < lowerBand OR price > upperBand)
+        ),
+        -- Deduplicate: keep the most extreme signal per ticker across the lookback window
+        RankedSignals AS (
+            SELECT *,
+                ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY distanceFromBand DESC) as rn
+            FROM FilteredSignals
         )
-        SELECT 
-            *,
-            CASE WHEN price < lowerBand THEN 'lower' ELSE 'upper' END as bandSide,
-            CASE 
-                WHEN price < lowerBand THEN ((lowerBand - price) / lowerBand) * 100
-                ELSE ((price - upperBand) / upperBand) * 100
-            END as distanceFromBand
-        FROM FilteredSignals
+        SELECT * FROM RankedSignals
+        WHERE rn = 1
         ORDER BY distanceFromBand DESC
         `;
 
@@ -342,8 +356,11 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
         return results.map(row => {
             const timestampVal = typeof row.processed_at === 'string' ? row.processed_at : row.processed_at?.value;
             let processedAtTs = 0;
+            let signalDateStr = '';
             if (timestampVal) {
-                processedAtTs = new Date(timestampVal).getTime();
+                const d = new Date(timestampVal);
+                processedAtTs = d.getTime();
+                signalDateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
             }
 
             return {
@@ -360,7 +377,8 @@ export const getBollingerOversoldStocks = async (snapshotId?: string, rsiThresho
                 upperBand: row.upperBand || 0,
                 distanceFromBand: row.distanceFromBand || 0,
                 bandSide: row.bandSide as 'lower' | 'upper',
-                processedAt: processedAtTs
+                processedAt: processedAtTs,
+                signalDate: signalDateStr
             };
         });
 

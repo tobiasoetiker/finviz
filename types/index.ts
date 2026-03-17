@@ -94,6 +94,7 @@ export interface BollingerSignalRow {
   distanceFromBand: number;
   bandSide: 'lower' | 'upper';
   processedAt: number;
+  signalDate: string;
 }
 
 export interface BollingerBacktestRow {
