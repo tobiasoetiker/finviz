@@ -6,7 +6,9 @@
       "Bash(ls -la /c/Users/TobiasOetiker/code/finviz/ | grep -E \"\\\\.html$|\\\\.js$|app$|src$\")",
       "Bash(find:*)",
       "Bash(npx tsc:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ]
   }
 }
