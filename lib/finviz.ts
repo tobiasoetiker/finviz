@@ -1,6 +1,6 @@
 'use server';
 
-import { IndustryApiResponse, IndustryRow, BollingerSignalRow, BollingerBacktestRow } from '@/types';
+import { IndustryApiResponse, IndustryRow, BollingerSignalRow, BollingerBacktestRow, VolatileStockRow } from '@/types';
 import { revalidatePath, unstable_cache } from 'next/cache';
 import { config } from './config';
 import { queryBigQuery } from './bigquery';
@@ -578,6 +578,135 @@ export const getBollingerBacktest = async (currentSnapshotId?: string, rsiThresh
 
     } catch (error) {
         console.error('Error fetching Bollinger backtest:', error);
+        throw error;
+    }
+};
+
+export const getVolatileStocks = async (
+    snapshotId?: string,
+    lookbackDays: number = 5,
+    groupBy: 'ticker' | 'industry' | 'sector' = 'ticker'
+): Promise<VolatileStockRow[]> => {
+    try {
+        console.log(`Fetching volatile stocks from BigQuery... snapshotId: ${snapshotId || 'live'}, lookback: ${lookbackDays}d, groupBy: ${groupBy}`);
+
+        const params: Record<string, string | number> = {};
+        if (snapshotId && snapshotId !== 'live') params.snapshotId = snapshotId;
+        params.lookbackDays = lookbackDays;
+
+        const groupedSelect = groupBy === 'ticker'
+            ? `SELECT ticker as name, ANY_VALUE(company) as company, ANY_VALUE(sector) as sector, ANY_VALUE(industry) as industry,
+                MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN price END) as price,
+                MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN market_cap END) as market_cap,
+                MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN daily_change END) as latest_change,
+                AVG(ABS(daily_change)) as atr_pct,
+                MAX(ABS(daily_change)) as max_move,
+                MIN(daily_change) as min_change,
+                MAX(daily_change) as max_change,
+                COUNT(*) as days_counted,
+                1 as stock_count
+            FROM StockChanges
+            GROUP BY ticker
+            HAVING COUNT(*) >= GREATEST(1, CAST(@lookbackDays AS INT64) / 2)`
+            : `WITH PerStock AS (
+                SELECT
+                    ticker, ${groupBy},
+                    MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN market_cap END) as market_cap,
+                    MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN daily_change END) as latest_change,
+                    AVG(ABS(daily_change)) as atr_pct,
+                    MAX(ABS(daily_change)) as max_move,
+                    MIN(daily_change) as min_change,
+                    MAX(daily_change) as max_change
+                FROM StockChanges
+                GROUP BY ticker, ${groupBy}
+                HAVING COUNT(*) >= GREATEST(1, CAST(@lookbackDays AS INT64) / 2)
+            )
+            SELECT
+                ${groupBy} as name, '' as company,
+                ${groupBy === 'industry' ? `ANY_VALUE((SELECT s.sector FROM StockChanges s WHERE s.industry = PerStock.${groupBy} LIMIT 1))` : `${groupBy}`} as sector,
+                ${groupBy === 'industry' ? `${groupBy}` : "''"} as industry,
+                0 as price,
+                SUM(market_cap) as market_cap,
+                SAFE_DIVIDE(SUM(latest_change * market_cap), NULLIF(SUM(market_cap), 0)) as latest_change,
+                SAFE_DIVIDE(SUM(atr_pct * market_cap), NULLIF(SUM(market_cap), 0)) as atr_pct,
+                MAX(max_move) as max_move,
+                MIN(min_change) as min_change,
+                MAX(max_change) as max_change,
+                0 as days_counted,
+                COUNT(*) as stock_count
+            FROM PerStock
+            WHERE ${groupBy} IS NOT NULL
+            GROUP BY ${groupBy}`;
+
+        const query = `
+        WITH SnapshotPrices AS (
+            SELECT
+                processed_at,
+                MAX(CASE WHEN ticker = 'AAPL' THEN price END) as aapl_price
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+            ${snapshotId && snapshotId !== 'live'
+                ? `WHERE CAST(processed_at AS STRING) <= @snapshotId`
+                : ''}
+            GROUP BY processed_at
+            ORDER BY processed_at DESC
+            LIMIT 40
+        ),
+        TradingDays AS (
+            SELECT
+                processed_at,
+                aapl_price,
+                LAG(aapl_price) OVER (ORDER BY processed_at ASC) as prev_aapl_price
+            FROM SnapshotPrices
+        ),
+        RecentTradingDays AS (
+            SELECT processed_at
+            FROM TradingDays
+            WHERE aapl_price != prev_aapl_price OR prev_aapl_price IS NULL
+            ORDER BY processed_at DESC
+            LIMIT @lookbackDays
+        ),
+        LatestDay AS (
+            SELECT MAX(processed_at) as latest_processed_at FROM RecentTradingDays
+        ),
+        StockChanges AS (
+            SELECT
+                h.ticker, h.company, h.sector, h.industry,
+                h.processed_at,
+                SAFE_CAST(REPLACE(h.change, '%', '') AS FLOAT64) as daily_change,
+                SAFE_CAST(h.price AS FLOAT64) as price,
+                SAFE_CAST(h.market_cap AS FLOAT64) * 1000000 as market_cap
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\` h
+            INNER JOIN RecentTradingDays rtd ON h.processed_at = rtd.processed_at
+            WHERE h.ticker IS NOT NULL AND h.price IS NOT NULL AND h.change IS NOT NULL
+        ),
+        VolatilityCalc AS (
+            ${groupedSelect}
+        )
+        SELECT * FROM VolatilityCalc
+        WHERE atr_pct IS NOT NULL
+        ORDER BY atr_pct DESC
+        `;
+
+        const results = await queryBigQuery(query, Object.keys(params).length > 0 ? params : undefined) as any[];
+
+        return results.map(row => ({
+            name: row.name,
+            company: row.company || row.name,
+            sector: row.sector || 'Unknown',
+            industry: row.industry || 'Unknown',
+            price: row.price || 0,
+            marketCap: row.market_cap || 0,
+            atrPct: row.atr_pct || 0,
+            latestChange: row.latest_change || 0,
+            maxMove: row.max_move || 0,
+            minChange: row.min_change || 0,
+            maxChange: row.max_change || 0,
+            daysCounted: row.days_counted || 0,
+            stockCount: row.stock_count || 1,
+        }));
+
+    } catch (error) {
+        console.error('Error fetching volatile stocks:', error);
         throw error;
     }
 };

@@ -9,6 +9,7 @@ const navLinks = [
     { href: '/', label: 'Dashboard' },
     { href: '/signals', label: 'Signals' },
     { href: '/backtest', label: 'Backtest' },
+    { href: '/volatility', label: 'Volatility' },
 ];
 
 export default function Navbar() {

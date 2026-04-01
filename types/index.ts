@@ -113,3 +113,19 @@ export interface BollingerBacktestRow {
   signalDate: string;
   marketCap: number;
 }
+
+export interface VolatileStockRow {
+  name: string;          // Ticker, industry, or sector name depending on groupBy
+  company: string;
+  sector: string;
+  industry: string;
+  price: number;
+  marketCap: number;
+  atrPct: number;        // Average |daily change %| over N days
+  latestChange: number;  // Most recent day's change %
+  maxMove: number;       // Largest single-day |change| in period
+  minChange: number;     // Most negative change in period
+  maxChange: number;     // Most positive change in period
+  daysCounted: number;   // How many trading days were used
+  stockCount: number;    // Number of stocks (1 for individual, N for groups)
+}
