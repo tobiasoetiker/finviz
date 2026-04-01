@@ -82,29 +82,29 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto table-scroll-container">
                 <table className="w-full text-sm text-left align-middle">
                     <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-xs">
                         <tr>
-                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
+                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors sticky left-0 z-10 bg-slate-50" onClick={() => handleSort('name')}>
                                 <div className="flex items-center space-x-1"><span>Name</span> <SortIcon column="name" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors w-32" onClick={() => handleSort('marketCap')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Market Cap</span> <SortIcon column="marketCap" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden sm:table-cell" onClick={() => handleSort('change')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('change')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Daily</span> <SortIcon column="change" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell" onClick={() => handleSort('week')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('week')}>
                                 <div className="flex items-center justify-end space-x-1"><span>{performanceLabel}</span> <SortIcon column="week" /></div>
                             </th>
-                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors hidden lg:table-cell" onClick={() => handleSort('month')}>
+                            <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('month')}>
                                 <div className="flex items-center justify-end space-x-1"><span>1 Month</span> <SortIcon column="month" /></div>
                             </th>
                             <th className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('momentum')}>
                                 <div className="flex items-center justify-end space-x-1"><span>Momentum ({momentumLabel})</span> <SortIcon column="momentum" /></div>
                             </th>
-                            <th className="px-6 py-4 text-left hidden xl:table-cell">
+                            <th className="px-6 py-4 text-left">
                                 <div className="flex items-center space-x-1"><span>Top Drivers</span></div>
                             </th>
                         </tr>
@@ -112,7 +112,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                     <tbody className="divide-y divide-slate-100">
                         {sortedData.map((item: GroupPerformance) => (
                             <tr key={item.name} className="hover:bg-slate-50/80 transition-colors group">
-                                <th scope="row" className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap max-w-[200px] truncate" title={item.name}>
+                                <th scope="row" className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap max-w-[200px] truncate sticky left-0 z-10 bg-white group-hover:bg-slate-50/80" title={item.name}>
                                     {groupBy === 'ticker' ? (
                                         <a
                                             href={`https://elite.finviz.com/quote.ashx?t=${item.name}&ty=c&r=m3&p=d&b=1`}
@@ -134,13 +134,13 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                                     />
                                     <span className="relative z-10 font-bold text-slate-700">{formatMoney(item.marketCap)}</span>
                                 </td>
-                                <td className="px-6 py-4 text-right hidden sm:table-cell">
+                                <td className="px-6 py-4 text-right">
                                     <span className={getBadgeClass(item.change)}>{formatPercent(item.change)}</span>
                                 </td>
-                                <td className="px-6 py-4 text-right hidden md:table-cell">
+                                <td className="px-6 py-4 text-right">
                                     <span className={getBadgeClass(item.week)}>{formatPercent(item.week)}</span>
                                 </td>
-                                <td className="px-6 py-4 text-right hidden lg:table-cell">
+                                <td className="px-6 py-4 text-right">
                                     <span className={getBadgeClass(item.month)}>{formatPercent(item.month)}</span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
@@ -148,7 +148,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                                         {formatPercent(item.momentum)}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-left hidden xl:table-cell">
+                                <td className="px-6 py-4 text-left">
                                     <div className="flex flex-wrap gap-1.5">
                                         {item.topStocks?.map((stock: { ticker: string; week: number }) => (
                                             <a
@@ -167,7 +167,7 @@ export default function PerformanceTable({ data, title = 'Industry Performance',
                         ))}
                         {sortedData.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                                     <div className="flex flex-col items-center justify-center space-y-2">
                                         <Search size={32} className="opacity-20" />
                                         <p>No industries found matching "{filter}"</p>

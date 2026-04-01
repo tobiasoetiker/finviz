@@ -76,24 +76,24 @@ export default function BollingerSignals({ data, rsiThreshold = 30, showSignalDa
     }
 
     return (
-        <div className="overflow-x-auto card">
+        <div className="overflow-x-auto table-scroll-container card">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                        <HeaderCell label="Ticker" sortKey="ticker" />
+                        <HeaderCell label="Ticker" sortKey="ticker" hiddenClass="sticky left-0 z-10 bg-slate-50" />
                         <HeaderCell label="Company" sortKey="company" />
-                        <HeaderCell label="Sector" sortKey="sector" hiddenClass="hidden sm:table-cell" />
+                        <HeaderCell label="Sector" sortKey="sector" />
                         {showSignalDate && <HeaderCell label="Signal" sortKey="processedAt" />}
                         <HeaderCell label="Price" sortKey="price" alignRight />
                         <HeaderCell label="RSI" sortKey="rsi" alignRight />
-                        <HeaderCell label="Market Cap" sortKey="marketCap" alignRight hiddenClass="hidden md:table-cell" />
+                        <HeaderCell label="Market Cap" sortKey="marketCap" alignRight />
                         <HeaderCell label="Distance" sortKey="distanceFromBand" alignRight />
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {sortedData.map((row) => (
-                        <tr key={row.ticker} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-3 px-4">
+                        <tr key={row.ticker} className="hover:bg-slate-50 transition-colors group">
+                            <td className="py-3 px-4 sticky left-0 z-10 bg-white group-hover:bg-slate-50">
                                 <a
                                     href={`https://elite.finviz.com/quote.ashx?t=${row.ticker}&ty=c&r=m3&p=d&b=1`}
                                     target="_blank"
@@ -104,7 +104,7 @@ export default function BollingerSignals({ data, rsiThreshold = 30, showSignalDa
                                 </a>
                             </td>
                             <td className="py-3 px-4 text-xs text-slate-700 font-medium truncate max-w-[120px]" title={row.company}>{row.company}</td>
-                            <td className="py-3 px-4 text-xs text-slate-600 hidden sm:table-cell">
+                            <td className="py-3 px-4 text-xs text-slate-600">
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700">
                                     {row.sector}
                                 </span>
@@ -122,7 +122,7 @@ export default function BollingerSignals({ data, rsiThreshold = 30, showSignalDa
                                     {row.rsi.toFixed(2)}
                                 </span>
                             </td>
-                            <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 font-medium hidden md:table-cell">
+                            <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 font-medium">
                                 {formatMarketCap(row.marketCap)}
                             </td>
                             <td className="py-3 px-4 text-right">

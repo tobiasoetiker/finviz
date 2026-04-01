@@ -21,7 +21,22 @@ body {
 }
 
 .pv-container {
-  @apply w-full max-w-[1400px] mx-auto px-10;
+  @apply w-full max-w-[1400px] mx-auto px-4 sm:px-6 md:px-10;
+}
+
+/* Scroll fade hint for horizontally scrollable tables */
+.table-scroll-container {
+  position: relative;
+}
+.table-scroll-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, white);
 }
 
 @keyframes ping {
