@@ -76,92 +76,149 @@ export default function VolatileStocks({ data, groupBy }: { data: VolatileStockR
     const isGrouped = groupBy !== 'ticker';
     const nameLabel = groupBy === 'sector' ? 'Sector' : groupBy === 'industry' ? 'Industry' : 'Ticker';
 
+    // Summary stats
+    const avgAtr = data.length > 0 ? data.reduce((sum, r) => sum + r.atrPct, 0) / data.length : 0;
+    const avgToday = data.length > 0 ? data.reduce((sum, r) => sum + r.latestChange, 0) / data.length : 0;
+    const winnersCount = data.filter(r => r.latestChange > 0).length;
+    const avgMaxMove = data.length > 0 ? data.reduce((sum, r) => sum + r.maxMove, 0) / data.length : 0;
+    const avgVolatility = data.length > 0 ? data.reduce((sum, r) => sum + Math.abs(r.avgChange), 0) / data.length : 0;
+
+    const formatPct = (val: number) => {
+        const sign = val >= 0 ? '+' : '';
+        return `${sign}${val.toFixed(2)}%`;
+    };
+
+    const pctColor = (val: number) => val >= 0 ? 'text-emerald-600' : 'text-rose-600';
+
     return (
-        <div className="overflow-x-auto table-scroll-container card">
-            <table className="w-full text-left border-collapse">
-                <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                        <HeaderCell label={nameLabel} sortKey="name" hiddenClass="sticky left-0 z-10 bg-slate-50" />
-                        {!isGrouped && <HeaderCell label="Company" sortKey="company" />}
-                        {groupBy === 'ticker' && <HeaderCell label="Sector" sortKey="sector" />}
-                        {groupBy === 'industry' && <HeaderCell label="Sector" sortKey="sector" />}
-                        {isGrouped && <HeaderCell label="Stocks" sortKey="stockCount" alignRight />}
-                        {!isGrouped && <HeaderCell label="Price" sortKey="price" alignRight />}
-                        <HeaderCell label="ATR%" sortKey="atrPct" alignRight />
-                        <HeaderCell label="Today" sortKey="latestChange" alignRight />
-                        <HeaderCell label="Max Move" sortKey="maxMove" alignRight />
-                        <HeaderCell label="Range" sortKey="minChange" alignRight />
-                        <HeaderCell label="Market Cap" sortKey="marketCap" alignRight />
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                    {sortedData.map((row) => (
-                        <tr key={row.name} className="hover:bg-slate-50 transition-colors group">
-                            <td className="py-3 px-4 sticky left-0 z-10 bg-white group-hover:bg-slate-50">
-                                {isGrouped ? (
-                                    <span className="font-bold text-slate-900 text-xs">{row.name}</span>
-                                ) : (
-                                    <a
-                                        href={`https://elite.finviz.com/quote.ashx?t=${row.name}&ty=c&r=m3&p=d&b=1`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-xs hover:bg-slate-200 transition-colors cursor-pointer"
-                                    >
-                                        {row.name}
-                                    </a>
+        <div className="space-y-4">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">{nameLabel}s</div>
+                    <div className="text-lg font-bold text-slate-900">{data.length}</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Win Rate</div>
+                    <div className={`text-lg font-bold ${winnersCount / data.length >= 0.5 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {((winnersCount / data.length) * 100).toFixed(0)}%
+                    </div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Avg ATR%</div>
+                    <div className="text-lg font-bold text-amber-700">{avgAtr.toFixed(2)}%</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Avg Today</div>
+                    <div className={`text-lg font-bold ${pctColor(avgToday)}`}>{formatPct(avgToday)}</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Avg Volatility</div>
+                    <div className="text-lg font-bold text-slate-700">{avgVolatility.toFixed(2)}%</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Avg Max Move</div>
+                    <div className="text-lg font-bold text-indigo-600">{avgMaxMove.toFixed(2)}%</div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto table-scroll-container card">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                            <HeaderCell label={nameLabel} sortKey="name" hiddenClass="sticky left-0 z-10 bg-slate-50" />
+                            {!isGrouped && <HeaderCell label="Company" sortKey="company" />}
+                            {groupBy === 'ticker' && <HeaderCell label="Sector" sortKey="sector" />}
+                            {groupBy === 'industry' && <HeaderCell label="Sector" sortKey="sector" />}
+                            {isGrouped && <HeaderCell label="Stocks" sortKey="stockCount" alignRight />}
+                            {!isGrouped && <HeaderCell label="Price" sortKey="price" alignRight />}
+                            <HeaderCell label="ATR%" sortKey="atrPct" alignRight />
+                            <HeaderCell label="Today" sortKey="latestChange" alignRight />
+                            <HeaderCell label="Avg Move" sortKey="avgChange" alignRight />
+                            <HeaderCell label="Max Move" sortKey="maxMove" alignRight />
+                            <HeaderCell label="Range" sortKey="minChange" alignRight />
+                            <HeaderCell label="Market Cap" sortKey="marketCap" alignRight />
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {sortedData.map((row) => (
+                            <tr key={row.name} className="hover:bg-slate-50 transition-colors group">
+                                <td className="py-3 px-4 sticky left-0 z-10 bg-white group-hover:bg-slate-50">
+                                    {isGrouped ? (
+                                        <span className="font-bold text-slate-900 text-xs">{row.name}</span>
+                                    ) : (
+                                        <a
+                                            href={`https://elite.finviz.com/quote.ashx?t=${row.name}&ty=c&r=m3&p=d&b=1`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+                                        >
+                                            {row.name}
+                                        </a>
+                                    )}
+                                </td>
+                                {!isGrouped && (
+                                    <td className="py-3 px-4 text-xs text-slate-700 font-medium truncate max-w-[120px]" title={row.company}>{row.company}</td>
                                 )}
-                            </td>
-                            {!isGrouped && (
-                                <td className="py-3 px-4 text-xs text-slate-700 font-medium truncate max-w-[120px]" title={row.company}>{row.company}</td>
-                            )}
-                            {(groupBy === 'ticker' || groupBy === 'industry') && (
-                                <td className="py-3 px-4 text-xs text-slate-600">
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700">
-                                        {row.sector}
+                                {(groupBy === 'ticker' || groupBy === 'industry') && (
+                                    <td className="py-3 px-4 text-xs text-slate-600">
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700">
+                                            {row.sector}
+                                        </span>
+                                    </td>
+                                )}
+                                {isGrouped && (
+                                    <td className="py-3 px-4 font-semibold text-slate-600 tabular-nums text-xs text-right">
+                                        {row.stockCount}
+                                    </td>
+                                )}
+                                {!isGrouped && (
+                                    <td className="py-3 px-4 font-bold text-slate-900 tabular-nums text-xs text-right">
+                                        ${row.price.toFixed(2)}
+                                    </td>
+                                )}
+                                <td className="py-3 px-4 text-right">
+                                    <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded tabular-nums text-xs">
+                                        {row.atrPct.toFixed(2)}%
                                     </span>
                                 </td>
-                            )}
-                            {isGrouped && (
-                                <td className="py-3 px-4 font-semibold text-slate-600 tabular-nums text-xs text-right">
-                                    {row.stockCount}
+                                <td className="py-3 px-4 text-right">
+                                    <span className={`font-bold tabular-nums px-2 py-0.5 rounded text-xs ${
+                                        row.latestChange >= 0
+                                            ? 'bg-emerald-50 text-emerald-600'
+                                            : 'bg-rose-50 text-rose-600'
+                                    }`}>
+                                        {row.latestChange >= 0 ? '+' : ''}{row.latestChange.toFixed(2)}%
+                                    </span>
                                 </td>
-                            )}
-                            {!isGrouped && (
-                                <td className="py-3 px-4 font-bold text-slate-900 tabular-nums text-xs text-right">
-                                    ${row.price.toFixed(2)}
+                                <td className="py-3 px-4 text-right">
+                                    <span className={`font-bold tabular-nums px-2 py-0.5 rounded text-xs ${
+                                        row.avgChange >= 0
+                                            ? 'bg-emerald-50 text-emerald-600'
+                                            : 'bg-rose-50 text-rose-600'
+                                    }`}>
+                                        {row.avgChange >= 0 ? '+' : ''}{row.avgChange.toFixed(2)}%
+                                    </span>
                                 </td>
-                            )}
-                            <td className="py-3 px-4 text-right">
-                                <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded tabular-nums text-xs">
-                                    {row.atrPct.toFixed(2)}%
-                                </span>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                                <span className={`font-bold tabular-nums px-2 py-0.5 rounded text-xs ${
-                                    row.latestChange >= 0
-                                        ? 'bg-emerald-50 text-emerald-600'
-                                        : 'bg-rose-50 text-rose-600'
-                                }`}>
-                                    {row.latestChange >= 0 ? '+' : ''}{row.latestChange.toFixed(2)}%
-                                </span>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                                <span className="font-bold text-slate-700 tabular-nums text-xs">
-                                    {row.maxMove.toFixed(2)}%
-                                </span>
-                            </td>
-                            <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 whitespace-nowrap">
-                                <span className="text-rose-500">{row.minChange.toFixed(2)}%</span>
-                                <span className="text-slate-300 mx-1">/</span>
-                                <span className="text-emerald-500">+{row.maxChange.toFixed(2)}%</span>
-                            </td>
-                            <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 font-medium">
-                                {formatMarketCap(row.marketCap)}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                                <td className="py-3 px-4 text-right">
+                                    <span className="font-bold text-slate-700 tabular-nums text-xs">
+                                        {row.maxMove.toFixed(2)}%
+                                    </span>
+                                </td>
+                                <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 whitespace-nowrap">
+                                    <span className="text-rose-500">{row.minChange.toFixed(2)}%</span>
+                                    <span className="text-slate-300 mx-1">/</span>
+                                    <span className="text-emerald-500">+{row.maxChange.toFixed(2)}%</span>
+                                </td>
+                                <td className="py-3 px-4 text-right text-xs tabular-nums text-slate-600 font-medium">
+                                    {formatMarketCap(row.marketCap)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
+
     );
 }

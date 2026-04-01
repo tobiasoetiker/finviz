@@ -1,6 +1,6 @@
 'use server';
 
-import { IndustryApiResponse, IndustryRow, BollingerSignalRow, BollingerBacktestRow, VolatileStockRow } from '@/types';
+import { IndustryApiResponse, IndustryRow, BollingerSignalRow, BollingerBacktestRow, VolatileStockRow, VolatilityBacktestRow } from '@/types';
 import { revalidatePath, unstable_cache } from 'next/cache';
 import { config } from './config';
 import { queryBigQuery } from './bigquery';
@@ -600,6 +600,7 @@ export const getVolatileStocks = async (
                 MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN market_cap END) as market_cap,
                 MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN daily_change END) as latest_change,
                 AVG(ABS(daily_change)) as atr_pct,
+                AVG(daily_change) as avg_change,
                 MAX(ABS(daily_change)) as max_move,
                 MIN(daily_change) as min_change,
                 MAX(daily_change) as max_change,
@@ -614,6 +615,7 @@ export const getVolatileStocks = async (
                     MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN market_cap END) as market_cap,
                     MAX(CASE WHEN processed_at = (SELECT latest_processed_at FROM LatestDay) THEN daily_change END) as latest_change,
                     AVG(ABS(daily_change)) as atr_pct,
+                    AVG(daily_change) as avg_change,
                     MAX(ABS(daily_change)) as max_move,
                     MIN(daily_change) as min_change,
                     MAX(daily_change) as max_change
@@ -629,6 +631,7 @@ export const getVolatileStocks = async (
                 SUM(market_cap) as market_cap,
                 SAFE_DIVIDE(SUM(latest_change * market_cap), NULLIF(SUM(market_cap), 0)) as latest_change,
                 SAFE_DIVIDE(SUM(atr_pct * market_cap), NULLIF(SUM(market_cap), 0)) as atr_pct,
+                SAFE_DIVIDE(SUM(avg_change * market_cap), NULLIF(SUM(market_cap), 0)) as avg_change,
                 MAX(max_move) as max_move,
                 MIN(min_change) as min_change,
                 MAX(max_change) as max_change,
@@ -698,6 +701,7 @@ export const getVolatileStocks = async (
             marketCap: row.market_cap || 0,
             atrPct: row.atr_pct || 0,
             latestChange: row.latest_change || 0,
+            avgChange: row.avg_change || 0,
             maxMove: row.max_move || 0,
             minChange: row.min_change || 0,
             maxChange: row.max_change || 0,
@@ -707,6 +711,177 @@ export const getVolatileStocks = async (
 
     } catch (error) {
         console.error('Error fetching volatile stocks:', error);
+        throw error;
+    }
+};
+
+export const getVolatilityBacktest = async (
+    currentSnapshotId?: string,
+    backtestDays: number = 5,
+    volatilityLookback: number = 5
+): Promise<{ rows: VolatilityBacktestRow[]; signalDate: string; currentDate: string }> => {
+    try {
+        console.log(`Fetching volatility backtest (${backtestDays}d hold, ${volatilityLookback}d window) from BigQuery...`);
+
+        // Step 1: Identify the trading days
+        const snapshotQuery = `
+            WITH snapshots AS (
+                SELECT
+                    CAST(processed_at AS STRING) as snapshot_date,
+                    MAX(CASE WHEN ticker = 'AAPL' THEN price END) as sample_price
+                FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+                ${currentSnapshotId && currentSnapshotId !== 'live'
+                    ? `WHERE CAST(processed_at AS STRING) <= @currentSnapshotId`
+                    : ''}
+                GROUP BY snapshot_date
+                ORDER BY snapshot_date DESC
+                LIMIT 60
+            )
+            SELECT snapshot_date, sample_price FROM snapshots ORDER BY snapshot_date DESC
+        `;
+
+        const snapshotParams = currentSnapshotId && currentSnapshotId !== 'live' ? { currentSnapshotId } : undefined;
+        const snapshotRows = await queryBigQuery(snapshotQuery, snapshotParams) as { snapshot_date: string | { value: string }; sample_price: number | null }[];
+
+        if (snapshotRows.length < backtestDays + 1) {
+            return { rows: [], signalDate: '', currentDate: '' };
+        }
+
+        const getVal = (row: typeof snapshotRows[number]) => typeof row.snapshot_date === 'string' ? row.snapshot_date : row.snapshot_date.value;
+        
+        // Deduplicate snapshots to unique trading days
+        const tradingDays: string[] = [getVal(snapshotRows[0])];
+        let lastPrice = snapshotRows[0].sample_price;
+
+        for (let i = 1; i < snapshotRows.length; i++) {
+            if (snapshotRows[i].sample_price !== lastPrice) {
+                tradingDays.push(getVal(snapshotRows[i]));
+                lastPrice = snapshotRows[i].sample_price;
+            }
+        }
+
+        if (tradingDays.length < backtestDays + 1) {
+             return { rows: [], signalDate: '', currentDate: '' };
+        }
+
+        const currentDate = tradingDays[0];
+        const signalDate = tradingDays[backtestDays];
+
+        console.log(`Volatility backtest: Comparing ${signalDate} -> ${currentDate}`);
+
+        // Step 2: Run the full backtest query
+        const backtestQuery = `
+        WITH SignalPrices AS (
+            -- Get unique trading days ending at signalDate
+            SELECT snapshot_date, sample_price
+            FROM (
+                SELECT CAST(processed_at AS STRING) as snapshot_date, MAX(CASE WHEN ticker = 'AAPL' THEN price END) as sample_price
+                FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+                WHERE CAST(processed_at AS STRING) <= @signalDate
+                GROUP BY processed_at
+                ORDER BY processed_at DESC
+                LIMIT 60
+            )
+        ),
+        SignalTradingDays AS (
+             -- Deduplicate to get the N trading days before signalDate
+             SELECT snapshot_date
+             FROM (
+                 SELECT snapshot_date, sample_price,
+                        LAG(sample_price) OVER (ORDER BY snapshot_date ASC) as prev_price
+                 FROM SignalPrices
+             )
+             WHERE sample_price != prev_price OR prev_price IS NULL
+             ORDER BY snapshot_date DESC
+             LIMIT @volatilityLookback
+        ),
+        HistoryAtSignal AS (
+            SELECT
+                h.ticker, h.company, h.sector, h.industry,
+                h.processed_at,
+                SAFE_CAST(REPLACE(h.change, '%', '') AS FLOAT64) as daily_change,
+                SAFE_CAST(h.price AS FLOAT64) as price,
+                SAFE_CAST(h.market_cap AS FLOAT64) * 1000000 as market_cap
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\` h
+            INNER JOIN SignalTradingDays std ON CAST(h.processed_at AS STRING) = std.snapshot_date
+            WHERE h.ticker IS NOT NULL AND h.price IS NOT NULL AND h.change IS NOT NULL
+        ),
+        VolatilityAtSignal AS (
+            SELECT
+                ticker, ANY_VALUE(company) as company, ANY_VALUE(sector) as sector,
+                AVG(ABS(daily_change)) as atr_pct,
+                MAX(CASE WHEN CAST(processed_at AS STRING) = @signalDate THEN price END) as signalPrice,
+                MAX(CASE WHEN CAST(processed_at AS STRING) = @signalDate THEN market_cap END) as marketCap
+            FROM HistoryAtSignal
+            GROUP BY ticker
+            HAVING COUNT(*) >= GREATEST(1, CAST(@volatilityLookback AS INT64) / 2)
+        ),
+        TopVolatile AS (
+            SELECT * FROM VolatilityAtSignal
+            WHERE atr_pct IS NOT NULL AND signalPrice > 0
+            ORDER BY atr_pct DESC
+            LIMIT 25
+        ),
+        CurrentPrices AS (
+            SELECT
+                ticker,
+                SAFE_CAST(price AS FLOAT64) as currentPrice
+            FROM \`${config.gcp.projectId}.stock_data.processed_stock_data_history\`
+            WHERE CAST(processed_at AS STRING) = @currentDate
+              AND ticker IS NOT NULL AND price IS NOT NULL
+        ),
+        MarketReturn AS (
+            SELECT
+                SAFE_DIVIDE(
+                    SUM((c.currentPrice - p.signalPrice) / p.signalPrice * p.marketCap),
+                    SUM(p.marketCap)
+                ) * 100 as marketReturn
+            FROM (
+                SELECT ticker, signalPrice, marketCap
+                FROM VolatilityAtSignal
+                WHERE signalPrice > 0 AND marketCap > 0
+            ) p
+            JOIN CurrentPrices c ON p.ticker = c.ticker
+        )
+        SELECT
+            v.ticker, v.company, v.sector,
+            v.signalPrice, v.atr_pct as signalAtrPct, v.marketCap,
+            c.currentPrice,
+            (c.currentPrice - v.signalPrice) / v.signalPrice * 100 as returnPct,
+            COALESCE(m.marketReturn, 0) as spyReturnPct,
+            (c.currentPrice - v.signalPrice) / v.signalPrice * 100 - COALESCE(m.marketReturn, 0) as excessReturnPct
+        FROM TopVolatile v
+        JOIN CurrentPrices c ON v.ticker = c.ticker
+        CROSS JOIN MarketReturn m
+        ORDER BY returnPct DESC
+        `;
+
+        const backtestParams = {
+            signalDate,
+            currentDate,
+            volatilityLookback
+        };
+
+        const results = await queryBigQuery(backtestQuery, backtestParams) as any[];
+
+        const rows: VolatilityBacktestRow[] = results.map(row => ({
+            ticker: row.ticker,
+            company: row.company || row.ticker,
+            sector: row.sector || 'Unknown',
+            signalPrice: row.signalPrice || 0,
+            signalAtrPct: row.signalAtrPct || 0,
+            currentPrice: row.currentPrice || 0,
+            returnPct: row.returnPct || 0,
+            spyReturnPct: row.spyReturnPct || 0,
+            excessReturnPct: row.excessReturnPct || 0,
+            signalDate,
+            marketCap: row.marketCap || 0
+        }));
+
+        return { rows, signalDate, currentDate };
+
+    } catch (error) {
+        console.error('Error fetching volatility backtest:', error);
         throw error;
     }
 };

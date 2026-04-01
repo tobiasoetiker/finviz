@@ -3,20 +3,24 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import VolatileStocks from './VolatileStocks';
-import { VolatileStockRow } from '@/types';
-import { ChevronDown, Check } from 'lucide-react';
+import VolatilityBacktest from './VolatilityBacktest';
+import { VolatileStockRow, VolatilityBacktestRow } from '@/types';
+import { ChevronDown, Check, Zap, History } from 'lucide-react';
 
 interface Props {
     snapshots: { id: string; label: string; timestamp: number }[];
     volatileStocks: VolatileStockRow[];
     lookbackDays: number;
     groupBy: 'ticker' | 'industry' | 'sector';
+    mode: 'live' | 'backtest';
+    backtestDays: number;
+    backtestData?: { rows: VolatilityBacktestRow[]; signalDate: string; currentDate: string };
 }
 
 const groupByLabels = { ticker: 'Stocks', industry: 'Industries', sector: 'Sectors' } as const;
 const topOptions = [10, 20, 50, 0] as const;
 
-export default function VolatilityContent({ snapshots, volatileStocks, lookbackDays, groupBy }: Props) {
+export default function VolatilityContent({ snapshots, volatileStocks, lookbackDays, groupBy, mode, backtestDays, backtestData }: Props) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const currentSnapshot = searchParams.get('snapshot') || (snapshots.length > 0 ? snapshots[0].id : '');
@@ -38,11 +42,15 @@ export default function VolatilityContent({ snapshots, volatileStocks, lookbackD
     }, []);
 
     const sectors = useMemo(() => {
-        const unique = [...new Set(volatileStocks.map(r => r.sector))].sort();
-        return unique;
-    }, [volatileStocks]);
+        const dataForSectors = mode === 'live' ? volatileStocks : (backtestData?.rows || []);
+        if (mode === 'live') {
+            return [...new Set(volatileStocks.map(r => r.sector))].sort();
+        } else {
+             return [...new Set((backtestData?.rows || []).map(r => r.sector))].sort();
+        }
+    }, [volatileStocks, backtestData, mode]);
 
-    const filteredStocks = useMemo(() => {
+    const filteredLiveStocks = useMemo(() => {
         let result = volatileStocks;
         if (selectedSectors.length > 0 && groupBy !== 'sector') {
             result = result.filter(r => selectedSectors.includes(r.sector));
@@ -52,6 +60,21 @@ export default function VolatilityContent({ snapshots, volatileStocks, lookbackD
         }
         return result;
     }, [volatileStocks, selectedSectors, topN, groupBy]);
+
+    const filteredBacktestData = useMemo(() => {
+        if (!backtestData) return undefined;
+        let result = backtestData.rows;
+        if (selectedSectors.length > 0) {
+            result = result.filter(r => selectedSectors.includes(r.sector));
+        }
+        if (topN > 0) {
+            result = result.slice(0, topN);
+        }
+        return {
+            ...backtestData,
+            rows: result
+        };
+    }, [backtestData, selectedSectors, topN]);
 
     const updateParam = (key: string, value: string) => {
         const params = new URLSearchParams(window.location.search);
@@ -86,6 +109,31 @@ export default function VolatilityContent({ snapshots, volatileStocks, lookbackD
         <div className="space-y-16">
             <div className="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm border-b border-slate-100 py-4">
                 <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex p-1 bg-slate-100 rounded-lg">
+                        <button
+                            onClick={() => updateParam('mode', 'live')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'live'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            <Zap size={14} fill={mode === 'live' ? 'currentColor' : 'none'} className={mode === 'live' ? 'text-amber-500' : ''} />
+                            Live
+                        </button>
+                        <button
+                            onClick={() => updateParam('mode', 'backtest')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'backtest'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            <History size={14} className={mode === 'backtest' ? 'text-indigo-500' : ''} />
+                            Backtest
+                        </button>
+                    </div>
+
+                    <div className="w-px h-6 bg-slate-200" />
+
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Snapshot</label>
                     <select
                         value={currentSnapshot}
@@ -97,20 +145,23 @@ export default function VolatilityContent({ snapshots, volatileStocks, lookbackD
                         ))}
                     </select>
 
-                    <div className="w-px h-6 bg-slate-200" />
+                    {mode === 'live' && (
+                        <>
+                            <div className="w-px h-6 bg-slate-200" />
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Group By</label>
+                            <select
+                                value={groupBy}
+                                onChange={(e) => updateParam('groupBy', e.target.value)}
+                                className="text-sm font-semibold text-slate-800 border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            >
+                                <option value="ticker">Stock</option>
+                                <option value="industry">Industry</option>
+                                <option value="sector">Sector</option>
+                            </select>
+                        </>
+                    )}
 
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Group By</label>
-                    <select
-                        value={groupBy}
-                        onChange={(e) => updateParam('groupBy', e.target.value)}
-                        className="text-sm font-semibold text-slate-800 border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                    >
-                        <option value="ticker">Stock</option>
-                        <option value="industry">Industry</option>
-                        <option value="sector">Sector</option>
-                    </select>
-
-                    {groupBy !== 'sector' && (
+                    {(mode === 'backtest' || (mode === 'live' && groupBy !== 'sector')) && (
                         <>
                             <div className="w-px h-6 bg-slate-200" />
 
@@ -199,23 +250,57 @@ export default function VolatilityContent({ snapshots, volatileStocks, lookbackD
             <div>
                 <div className="mb-6">
                     <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-                        Most Volatile {groupByLabels[groupBy]}
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full tracking-widest uppercase align-middle">ATR%</span>
+                        {mode === 'live' ? 'Most Volatile' : 'Volatility Return Backtest'} {mode === 'live' ? groupByLabels[groupBy] : 'Stocks'}
+                        {mode === 'live' && (
+                             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full tracking-widest uppercase align-middle">ATR%</span>
+                        )}
                     </h2>
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        <p className="text-slate-500 text-sm">Average daily move over the last</p>
-                        <select
-                            value={lookbackDays}
-                            onChange={(e) => updateParam('lookbackDays', e.target.value)}
-                            className="text-sm font-semibold text-slate-800 border border-slate-300 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
-                        >
-                            {[1, 3, 5, 10, 14].map((d) => (
-                                <option key={d} value={d}>{d} {d === 1 ? 'trading day' : 'trading days'}</option>
-                            ))}
-                        </select>
+                        {mode === 'live' ? (
+                            <>
+                                <p className="text-slate-500 text-sm">Average daily move over the last</p>
+                                <select
+                                    value={lookbackDays}
+                                    onChange={(e) => updateParam('lookbackDays', e.target.value)}
+                                    className="text-sm font-semibold text-slate-800 border border-slate-300 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+                                >
+                                    {[1, 3, 5, 10, 14].map((d) => (
+                                        <option key={d} value={d}>{d} {d === 1 ? 'trading day' : 'trading days'}</option>
+                                    ))}
+                                </select>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-slate-500 text-sm">Performance of most volatile stocks over</p>
+                                <div className="flex gap-1">
+                                    {[1, 2, 3, 5, 10, 15].map((d) => (
+                                        <button
+                                            key={d}
+                                            onClick={() => updateParam('backtestDays', String(d))}
+                                            className={`px-2.5 py-0.5 rounded-md text-xs font-semibold transition-colors ${backtestDays === d
+                                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                                                : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                                }`}
+                                        >
+                                            {d}d
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-slate-500 text-sm">holding period, relative to market.</p>
+                            </>
+                        )}
                     </div>
                 </div>
-                <VolatileStocks data={filteredStocks} groupBy={groupBy} />
+
+                {mode === 'live' ? (
+                    <VolatileStocks data={filteredLiveStocks} groupBy={groupBy} />
+                ) : (
+                    <VolatilityBacktest 
+                        data={filteredBacktestData?.rows || []} 
+                        signalDate={filteredBacktestData?.signalDate || ''} 
+                        currentDate={filteredBacktestData?.currentDate || ''} 
+                    />
+                )}
             </div>
         </div>
     );

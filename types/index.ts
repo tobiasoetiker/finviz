@@ -123,9 +123,24 @@ export interface VolatileStockRow {
   marketCap: number;
   atrPct: number;        // Average |daily change %| over N days
   latestChange: number;  // Most recent day's change %
+  avgChange: number;     // Average daily change % (signed) over N days
   maxMove: number;       // Largest single-day |change| in period
   minChange: number;     // Most negative change in period
   maxChange: number;     // Most positive change in period
   daysCounted: number;   // How many trading days were used
   stockCount: number;    // Number of stocks (1 for individual, N for groups)
+}
+
+export interface VolatilityBacktestRow {
+  ticker: string;
+  company: string;
+  sector: string;
+  signalPrice: number;
+  signalAtrPct: number;
+  currentPrice: number;
+  returnPct: number;
+  spyReturnPct: number;
+  excessReturnPct: number;
+  signalDate: string;
+  marketCap: number;
 }
